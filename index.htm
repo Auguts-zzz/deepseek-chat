@@ -608,21 +608,4 @@
                     userInput.value = "";
                     userInput.style.height = "auto";
                     sendMessage(text);
-                }
-            }
-        });
-        userInput.addEventListener("input", autoResizeTextarea);
-        window.addEventListener("click", (e) => { if (e.target === convModal) closeModalPanel(); if (e.target === msgHistoryModal) closeHistoryModalPanel(); });
-    }
-
-    function bootstrap() {
-        loadApiKey();
-        loadAllData();
-        initDeepThinkToggle();
-        bindEvents();
-    }
-    bootstrap();
-})();
-</script>
-</body>
-</html>
+ 
