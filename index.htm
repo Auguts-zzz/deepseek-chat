@@ -69,7 +69,7 @@
     </div>
     <div class="messages-container" id="messagesContainer">
         <div class="message assistant-message">
-            <div class="bubble">✨ 新版已加载：点击消息旁的📜可查看并切换该消息的历史版本。编辑消息时自动填入原内容。</div>
+            <div class="bubble">✨ 加载中...</div>
         </div>
     </div>
     <div class="input-area">
@@ -81,553 +81,526 @@
     <div class="footer-note">🔒 API Key 仅存本地 | 每条消息独立历史版本</div>
 </div>
 
-<!-- 对话列表模态框 -->
 <div id="convModal" class="modal"><div class="modal-content"><div class="modal-header"><span>📁 我的对话</span><button id="closeModalBtn" class="icon-btn">✖️</button></div><ul id="convListUl"></ul><button id="modalNewConvBtn" class="new-conv-btn">➕ 新建对话</button></div></div>
-<!-- 消息历史版本模态框 -->
 <div id="msgHistoryModal" class="modal"><div class="modal-content"><div class="modal-header"><span>📜 消息历史版本</span><button id="closeHistoryModalBtn" class="icon-btn">✖️</button></div><ul id="historyListUl" class="version-list"></ul></div></div>
 
 <script>
-    (function(){
-        // ---------- 配置 ----------
-        const DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions";
-        const SYSTEM_MESSAGE = { role: "system", content: "你是DeepSeek助手，扮演角色进行对话，保持一致性，使用中文。" };
-        
-        // 数据结构：每个对话包含一个消息数组，每条消息包含 { role, content, history }，history是该消息的历史版本数组（字符串）
-        let conversations = [];
-        let activeConvId = null;
-        let currentApiKey = "";
-        let currentModel = "deepseek-chat";
-        let isLoading = false;
+(function(){
+    // ==================== 配置 ====================
+    const DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions";
+    const SYSTEM_MESSAGE = { role: "system", content: "你是DeepSeek助手，扮演角色进行对话，保持一致性，使用中文。" };
+    
+    let conversations = [];
+    let activeConvId = null;
+    let currentApiKey = "";
+    let currentModel = "deepseek-chat";
+    let isLoading = false;
 
-        // DOM
-        const msgContainer = document.getElementById("messagesContainer");
-        const userInput = document.getElementById("userInput");
-        const sendBtn = document.getElementById("sendButton");
-        const apiInput = document.getElementById("apiKeyInput");
-        const saveApi = document.getElementById("saveApiBtn");
-        const toggleDeep = document.getElementById("deepThinkToggle");
-        const convNameSpan = document.getElementById("currentConvName");
-        const showConvList = document.getElementById("showConvListBtn");
-        const newConv = document.getElementById("newConvBtn");
-        const exportBtn = document.getElementById("exportBackupBtn");
-        const importBtn = document.getElementById("importBackupBtn");
-        const convModal = document.getElementById("convModal");
-        const msgHistoryModal = document.getElementById("msgHistoryModal");
-        const convListUl = document.getElementById("convListUl");
-        const closeModalBtn = document.getElementById("closeModalBtn");
-        const modalNewConv = document.getElementById("modalNewConvBtn");
-        const closeHistoryModal = document.getElementById("closeHistoryModalBtn");
-        const historyListUl = document.getElementById("historyListUl");
+    // DOM 元素
+    const msgContainer = document.getElementById("messagesContainer");
+    const userInput = document.getElementById("userInput");
+    const sendBtn = document.getElementById("sendButton");
+    const apiInput = document.getElementById("apiKeyInput");
+    const saveApiBtn = document.getElementById("saveApiBtn");
+    const toggleDeep = document.getElementById("deepThinkToggle");
+    const convNameSpan = document.getElementById("currentConvName");
+    const showConvListBtn = document.getElementById("showConvListBtn");
+    const newConvBtn = document.getElementById("newConvBtn");
+    const exportBackupBtn = document.getElementById("exportBackupBtn");
+    const importBackupBtn = document.getElementById("importBackupBtn");
+    const convModal = document.getElementById("convModal");
+    const msgHistoryModal = document.getElementById("msgHistoryModal");
+    const convListUl = document.getElementById("convListUl");
+    const closeModalBtn = document.getElementById("closeModalBtn");
+    const modalNewConvBtn = document.getElementById("modalNewConvBtn");
+    const closeHistoryModalBtn = document.getElementById("closeHistoryModalBtn");
+    const historyListUl = document.getElementById("historyListUl");
 
-        // 辅助函数
-        function saveAll() {
-            localStorage.setItem("ds_conversations", JSON.stringify(conversations));
-            localStorage.setItem("ds_activeConvId", activeConvId);
-        }
+    // ==================== 辅助函数 ====================
+    function saveAll() {
+        localStorage.setItem("ds_conversations", JSON.stringify(conversations));
+        localStorage.setItem("ds_activeConvId", activeConvId);
+    }
 
-        function getCurrentConv() {
-            return conversations.find(c => c.id === activeConvId);
-        }
+    function getCurrentConv() {
+        return conversations.find(c => c.id === activeConvId);
+    }
 
-        function getCurrentMessages() {
-            const conv = getCurrentConv();
-            if (!conv) return [];
-            return conv.messages || [];
-        }
+    function getCurrentMessages() {
+        const conv = getCurrentConv();
+        if (!conv) return [];
+        return conv.messages || [];
+    }
 
-        function saveCurrentMessages(messages) {
-            const conv = getCurrentConv();
-            if (conv) {
-                conv.messages = messages;
-                // 自动生成标题（取第一条用户消息前20字）
-                const firstUser = messages.find(m => m.role === "user");
-                if (firstUser && (conv.title === "新对话" || !conv.title)) {
-                    let newTitle = firstUser.content.slice(0, 20);
-                    if (newTitle.length < 1) newTitle = "对话";
-                    conv.title = newTitle;
-                }
-                saveAll();
-                renderMessages();
-                updateTitle();
+    function saveCurrentMessages(messages) {
+        const conv = getCurrentConv();
+        if (conv) {
+            conv.messages = messages;
+            // 自动生成标题
+            const firstUser = messages.find(m => m.role === "user");
+            if (firstUser && (conv.title === "新对话" || !conv.title)) {
+                let newTitle = firstUser.content.slice(0, 20);
+                if (newTitle.length < 1) newTitle = "对话";
+                conv.title = newTitle;
             }
+            saveAll();
+            renderMessages();
+            updateTitle();
         }
+    }
 
-        // 添加或更新消息的历史记录
-        function addMessageHistory(msgIndex, newContent) {
-            const messages = getCurrentMessages();
-            if (msgIndex >= messages.length) return;
-            const msg = messages[msgIndex];
-            if (!msg.history) msg.history = [];
-            // 避免重复添加相同内容
-            if (msg.history[msg.history.length-1] !== msg.content) {
-                msg.history.push(msg.content);
-                if (msg.history.length > 20) msg.history.shift();
-            }
-            msg.content = newContent;
-            saveCurrentMessages(messages);
+    function addMessageHistory(msgIndex, newContent) {
+        const messages = getCurrentMessages();
+        if (msgIndex >= messages.length) return;
+        const msg = messages[msgIndex];
+        if (!msg.history) msg.history = [];
+        if (msg.history[msg.history.length-1] !== msg.content) {
+            msg.history.push(msg.content);
+            if (msg.history.length > 20) msg.history.shift();
         }
+        msg.content = newContent;
+        saveCurrentMessages(messages);
+    }
 
-        // 渲染消息列表
-        function renderMessages() {
-            const messages = getCurrentMessages();
-            msgContainer.innerHTML = "";
-            if (messages.length === 0) {
-                msgContainer.innerHTML = `<div class="message assistant-message"><div class="bubble">开始对话吧～</div></div>`;
-                return;
-            }
-            messages.forEach((msg, idx) => {
-                const isUser = msg.role === "user";
-                const div = document.createElement("div");
-                div.className = `message ${isUser ? "user-message" : "assistant-message"}`;
-                const bubble = document.createElement("div");
-                bubble.className = "bubble";
-                bubble.innerText = msg.content;
-                div.appendChild(bubble);
-                const actions = document.createElement("div");
-                actions.className = "message-actions";
-                // 复制按钮
-                const copyBtn = document.createElement("button");
-                copyBtn.className = "action-btn";
-                copyBtn.innerHTML = "📋 复制";
-                copyBtn.onclick = async (e) => {
+    function renderMessages() {
+        const messages = getCurrentMessages();
+        msgContainer.innerHTML = "";
+        if (messages.length === 0) {
+            msgContainer.innerHTML = `<div class="message assistant-message"><div class="bubble">开始对话吧～</div></div>`;
+            return;
+        }
+        messages.forEach((msg, idx) => {
+            const isUser = msg.role === "user";
+            const div = document.createElement("div");
+            div.className = `message ${isUser ? "user-message" : "assistant-message"}`;
+            const bubble = document.createElement("div");
+            bubble.className = "bubble";
+            bubble.innerText = msg.content;
+            div.appendChild(bubble);
+            const actions = document.createElement("div");
+            actions.className = "message-actions";
+            // 复制按钮
+            const copyBtn = document.createElement("button");
+            copyBtn.className = "action-btn";
+            copyBtn.innerHTML = "📋 复制";
+            copyBtn.onclick = async (e) => {
+                e.stopPropagation();
+                await navigator.clipboard.writeText(msg.content);
+                copyBtn.innerHTML = "✅";
+                setTimeout(() => copyBtn.innerHTML = "📋 复制", 1000);
+            };
+            actions.appendChild(copyBtn);
+            // 历史版本按钮
+            const historyBtn = document.createElement("button");
+            historyBtn.className = "action-btn";
+            historyBtn.innerHTML = "📜 历史";
+            historyBtn.onclick = (e) => {
+                e.stopPropagation();
+                showMessageHistory(idx, msg.content, msg.history || []);
+            };
+            actions.appendChild(historyBtn);
+            // 编辑按钮（仅用户消息）
+            if (isUser) {
+                const editBtn = document.createElement("button");
+                editBtn.className = "action-btn";
+                editBtn.innerHTML = "✏️ 编辑";
+                editBtn.onclick = (e) => {
                     e.stopPropagation();
-                    await navigator.clipboard.writeText(msg.content);
-                    copyBtn.innerHTML = "✅";
-                    setTimeout(() => copyBtn.innerHTML = "📋 复制", 1000);
+                    editUserMessage(idx, msg.content);
                 };
-                actions.appendChild(copyBtn);
-                // 历史版本按钮（只要有历史版本或当前内容可保存）
-                const historyBtn = document.createElement("button");
-                historyBtn.className = "action-btn";
-                historyBtn.innerHTML = "📜 历史";
-                historyBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    showMessageHistory(idx, msg.content, msg.history || []);
-                };
-                actions.appendChild(historyBtn);
-                // 编辑按钮（仅用户消息）
-                if (isUser) {
-                    const editBtn = document.createElement("button");
-                    editBtn.className = "action-btn";
-                    editBtn.innerHTML = "✏️ 编辑";
-                    editBtn.onclick = (e) => {
+                actions.appendChild(editBtn);
+            }
+            // 重新生成按钮（仅最后一条AI消息）
+            if (!isUser) {
+                const lastAssistantIdx = messages.reduce((last, m, i) => m.role === "assistant" ? i : last, -1);
+                if (idx === lastAssistantIdx) {
+                    const regenBtn = document.createElement("button");
+                    regenBtn.className = "action-btn";
+                    regenBtn.innerHTML = "🔄 重新生成";
+                    regenBtn.onclick = (e) => {
                         e.stopPropagation();
-                        editUserMessage(idx, msg.content);
+                        regenerateLastAssistant();
                     };
-                    actions.appendChild(editBtn);
+                    actions.appendChild(regenBtn);
                 }
-                // 重新生成按钮（仅最后一条AI消息）
-                if (!isUser) {
-                    const lastAssistantIdx = messages.reduce((last, m, i) => m.role === "assistant" ? i : last, -1);
-                    if (idx === lastAssistantIdx) {
-                        const regenBtn = document.createElement("button");
-                        regenBtn.className = "action-btn";
-                        regenBtn.innerHTML = "🔄 重新生成";
-                        regenBtn.onclick = (e) => {
-                            e.stopPropagation();
-                            regenerateLastAssistant();
-                        };
-                        actions.appendChild(regenBtn);
-                    }
-                }
-                div.appendChild(actions);
-                const timeSpan = document.createElement("div");
-                timeSpan.className = "message-time";
-                timeSpan.innerText = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                div.appendChild(timeSpan);
-                msgContainer.appendChild(div);
-            });
+            }
+            div.appendChild(actions);
+            const timeSpan = document.createElement("div");
+            timeSpan.className = "message-time";
+            timeSpan.innerText = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            div.appendChild(timeSpan);
+            msgContainer.appendChild(div);
+        });
+        msgContainer.scrollTop = msgContainer.scrollHeight;
+    }
+
+    function updateTitle() {
+        const conv = getCurrentConv();
+        convNameSpan.innerText = conv ? (conv.title || "对话") : "对话";
+    }
+
+    function showLoading() {
+        let ld = document.getElementById("loadingMsg");
+        if (!ld) {
+            ld = document.createElement("div");
+            ld.className = "message assistant-message";
+            ld.id = "loadingMsg";
+            ld.innerHTML = `<div class="loading-bubble"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>`;
+            msgContainer.appendChild(ld);
             msgContainer.scrollTop = msgContainer.scrollHeight;
         }
+    }
+    function hideLoading() { document.getElementById("loadingMsg")?.remove(); }
 
-        function updateTitle() {
-            const conv = getCurrentConv();
-            convNameSpan.innerText = conv ? (conv.title || "对话") : "对话";
-        }
-
-        function showLoading() {
-            let ld = document.getElementById("loadingMsg");
-            if (!ld) {
-                ld = document.createElement("div");
-                ld.className = "message assistant-message";
-                ld.id = "loadingMsg";
-                ld.innerHTML = `<div class="loading-bubble"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>`;
-                msgContainer.appendChild(ld);
-                msgContainer.scrollTop = msgContainer.scrollHeight;
+    async function callAPI(messages) {
+        if (!currentApiKey) throw new Error("请先保存 API Key");
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        try {
+            const res = await fetch(DEEPSEEK_API_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${currentApiKey}` },
+                body: JSON.stringify({ model: currentModel, messages, temperature: 0.7, max_tokens: 2000, stream: false }),
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            if (!res.ok) {
+                let err = `HTTP ${res.status}`;
+                try { const j = await res.json(); err = j.error?.message || err; } catch(e) {}
+                throw new Error(err);
             }
+            const data = await res.json();
+            if (!data.choices?.[0]?.message?.content) throw new Error("回复为空");
+            return data.choices[0].message.content;
+        } catch (err) {
+            clearTimeout(timeoutId);
+            throw err;
         }
-        function hideLoading() { document.getElementById("loadingMsg")?.remove(); }
+    }
 
-        // API调用（带超时）
-        async function callAPI(messages) {
-            if (!currentApiKey) throw new Error("请先保存 API Key");
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 15000);
-            try {
-                const res = await fetch(DEEPSEEK_API_URL, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${currentApiKey}` },
-                    body: JSON.stringify({ model: currentModel, messages, temperature: 0.7, max_tokens: 2000, stream: false }),
-                    signal: controller.signal
-                });
-                clearTimeout(timeoutId);
-                if (!res.ok) {
-                    let err = `HTTP ${res.status}`;
-                    try { const j = await res.json(); err = j.error?.message || err; } catch(e) {}
-                    throw new Error(err);
-                }
-                const data = await res.json();
-                if (!data.choices?.[0]?.message?.content) throw new Error("回复为空");
-                return data.choices[0].message.content;
-            } catch (err) {
-                clearTimeout(timeoutId);
-                throw err;
-            }
+    async function sendMessage(text) {
+        if (isLoading) { alert("请等待上一条回复完成"); return; }
+        const conv = getCurrentConv();
+        if (!conv) return;
+        const oldMsgs = getCurrentMessages();
+        const newUserMsg = { role: "user", content: text, history: [] };
+        const updated = [...oldMsgs, newUserMsg];
+        saveCurrentMessages(updated);
+        isLoading = true;
+        sendBtn.classList.add("disabled");
+        showLoading();
+        try {
+            const apiMessages = updated.map(m => ({ role: m.role, content: m.content }));
+            const reply = await callAPI(apiMessages);
+            hideLoading();
+            const newAssistantMsg = { role: "assistant", content: reply, history: [] };
+            const final = [...updated, newAssistantMsg];
+            saveCurrentMessages(final);
+        } catch (err) {
+            hideLoading();
+            const errMsg = err.message || "调用失败";
+            const errMsgObj = { role: "assistant", content: `⚠️ 错误：${errMsg}`, history: [] };
+            const final = [...updated, errMsgObj];
+            saveCurrentMessages(final);
+            if (errMsg.includes("Insufficient Balance")) alert("余额不足");
+            else if (errMsg.includes("API Key")) alert("API Key 无效");
+        } finally {
+            isLoading = false;
+            sendBtn.classList.remove("disabled");
         }
+    }
 
-        // 发送新消息
-        async function sendMessage(text) {
-            if (isLoading) { alert("请等待上一条回复完成"); return; }
-            const conv = getCurrentConv();
-            if (!conv) return;
-            const oldMsgs = getCurrentMessages();
-            const newUserMsg = { role: "user", content: text, history: [] };
-            const updated = [...oldMsgs, newUserMsg];
-            saveCurrentMessages(updated);
-            isLoading = true;
-            sendBtn.classList.add("disabled");
-            showLoading();
-            try {
-                // 构建API请求的消息列表（不含history字段）
-                const apiMessages = updated.map(m => ({ role: m.role, content: m.content }));
-                const reply = await callAPI(apiMessages);
-                hideLoading();
-                const newAssistantMsg = { role: "assistant", content: reply, history: [] };
-                const final = [...updated, newAssistantMsg];
-                saveCurrentMessages(final);
-            } catch (err) {
-                hideLoading();
-                const errMsg = err.message || "调用失败";
-                const errMsgObj = { role: "assistant", content: `⚠️ 错误：${errMsg}`, history: [] };
-                const final = [...updated, errMsgObj];
-                saveCurrentMessages(final);
-                if (errMsg.includes("Insufficient Balance")) alert("余额不足");
-                else if (errMsg.includes("API Key")) alert("API Key 无效");
-            } finally {
-                isLoading = false;
-                sendBtn.classList.remove("disabled");
-            }
+    async function editUserMessage(idx, oldContent) {
+        if (isLoading) return;
+        const newContent = prompt("编辑消息内容:", oldContent);
+        if (newContent === null || newContent.trim() === "") return;
+        const messages = getCurrentMessages();
+        if (idx >= messages.length) return;
+        const msg = messages[idx];
+        if (!msg.history) msg.history = [];
+        if (msg.history[msg.history.length-1] !== msg.content) {
+            msg.history.push(msg.content);
+            if (msg.history.length > 20) msg.history.shift();
         }
+        msg.content = newContent.trim();
+        const newMessages = messages.slice(0, idx+1);
+        saveCurrentMessages(newMessages);
+        await regenerateAfterEdit(newMessages);
+    }
 
-        // 编辑用户消息（预填原内容）
-        async function editUserMessage(idx, oldContent) {
-            if (isLoading) return;
-            const newContent = prompt("编辑消息内容:", oldContent);
-            if (newContent === null || newContent.trim() === "") return;
-            const messages = getCurrentMessages();
-            if (idx >= messages.length) return;
-            // 保存旧内容到历史
-            const msg = messages[idx];
-            if (!msg.history) msg.history = [];
-            if (msg.history[msg.history.length-1] !== msg.content) {
-                msg.history.push(msg.content);
-                if (msg.history.length > 20) msg.history.shift();
-            }
-            msg.content = newContent.trim();
-            // 删除该消息之后的所有消息（因为修改后需要重新生成后续）
-            const newMessages = messages.slice(0, idx+1);
-            saveCurrentMessages(newMessages);
-            // 重新生成AI回复（基于新的消息列表）
-            await regenerateAfterEdit(newMessages);
+    async function regenerateAfterEdit(messagesWithoutAssistant) {
+        if (isLoading) return;
+        isLoading = true;
+        sendBtn.classList.add("disabled");
+        showLoading();
+        try {
+            const apiMessages = messagesWithoutAssistant.map(m => ({ role: m.role, content: m.content }));
+            const reply = await callAPI(apiMessages);
+            hideLoading();
+            const newAssistant = { role: "assistant", content: reply, history: [] };
+            const final = [...messagesWithoutAssistant, newAssistant];
+            saveCurrentMessages(final);
+        } catch (err) {
+            hideLoading();
+            const errMsg = err.message || "调用失败";
+            const errAssistant = { role: "assistant", content: `⚠️ 错误：${errMsg}`, history: [] };
+            const final = [...messagesWithoutAssistant, errAssistant];
+            saveCurrentMessages(final);
+        } finally {
+            isLoading = false;
+            sendBtn.classList.remove("disabled");
         }
+    }
 
-        async function regenerateAfterEdit(messagesWithoutAssistant) {
-            if (isLoading) return;
-            isLoading = true;
-            sendBtn.classList.add("disabled");
-            showLoading();
-            try {
-                const apiMessages = messagesWithoutAssistant.map(m => ({ role: m.role, content: m.content }));
-                const reply = await callAPI(apiMessages);
-                hideLoading();
-                const newAssistant = { role: "assistant", content: reply, history: [] };
-                const final = [...messagesWithoutAssistant, newAssistant];
-                saveCurrentMessages(final);
-            } catch (err) {
-                hideLoading();
-                const errMsg = err.message || "调用失败";
-                const errAssistant = { role: "assistant", content: `⚠️ 错误：${errMsg}`, history: [] };
-                const final = [...messagesWithoutAssistant, errAssistant];
-                saveCurrentMessages(final);
-            } finally {
-                isLoading = false;
-                sendBtn.classList.remove("disabled");
-            }
+    async function regenerateLastAssistant() {
+        if (isLoading) return;
+        const messages = getCurrentMessages();
+        let lastAssistantIdx = -1;
+        for (let i = messages.length-1; i>=0; i--) {
+            if (messages[i].role === "assistant") { lastAssistantIdx = i; break; }
         }
-
-        async function regenerateLastAssistant() {
-            if (isLoading) return;
-            const messages = getCurrentMessages();
-            let lastAssistantIdx = -1;
-            for (let i = messages.length-1; i>=0; i--) {
-                if (messages[i].role === "assistant") { lastAssistantIdx = i; break; }
-            }
-            if (lastAssistantIdx === -1) { alert("没有可重新生成的消息"); return; }
-            const assistantMsg = messages[lastAssistantIdx];
-            // 保存当前版本到历史
-            if (!assistantMsg.history) assistantMsg.history = [];
-            if (assistantMsg.history[assistantMsg.history.length-1] !== assistantMsg.content) {
-                assistantMsg.history.push(assistantMsg.content);
-                if (assistantMsg.history.length > 20) assistantMsg.history.shift();
-            }
-            // 截断到该消息之前
-            const truncated = messages.slice(0, lastAssistantIdx);
-            saveCurrentMessages(truncated);
-            // 重新生成
-            await regenerateAfterEdit(truncated);
+        if (lastAssistantIdx === -1) { alert("没有可重新生成的消息"); return; }
+        const assistantMsg = messages[lastAssistantIdx];
+        if (!assistantMsg.history) assistantMsg.history = [];
+        if (assistantMsg.history[assistantMsg.history.length-1] !== assistantMsg.content) {
+            assistantMsg.history.push(assistantMsg.content);
+            if (assistantMsg.history.length > 20) assistantMsg.history.shift();
         }
+        const truncated = messages.slice(0, lastAssistantIdx);
+        saveCurrentMessages(truncated);
+        await regenerateAfterEdit(truncated);
+    }
 
-        // 显示消息历史版本
-        function showMessageHistory(idx, currentContent, historyArray) {
-            historyListUl.innerHTML = "";
-            const allVersions = [...historyArray, currentContent]; // 当前版本在最后
-            if (allVersions.length === 0) {
-                historyListUl.innerHTML = "<li>无历史版本</li>";
-            } else {
-                allVersions.forEach((ver, i) => {
-                    const li = document.createElement("li");
-                    const span = document.createElement("span");
-                    span.className = "version-title";
-                    const isCurrent = (i === allVersions.length-1);
-                    span.innerText = `版本 ${i+1}${isCurrent ? " (当前)" : ""}`;
-                    span.onclick = () => {
-                        if (isCurrent) return;
-                        // 切换消息内容到选中的历史版本
-                        const messages = getCurrentMessages();
-                        if (idx < messages.length) {
-                            messages[idx].content = ver;
-                            // 更新历史数组，确保该版本被标记
-                            if (!messages[idx].history) messages[idx].history = [];
-                            if (!messages[idx].history.includes(ver)) {
-                                messages[idx].history.push(ver);
-                                if (messages[idx].history.length > 20) messages[idx].history.shift();
-                            }
-                            saveCurrentMessages(messages);
-                            msgHistoryModal.style.display = "none";
+    function showMessageHistory(idx, currentContent, historyArray) {
+        historyListUl.innerHTML = "";
+        const allVersions = [...historyArray, currentContent];
+        if (allVersions.length === 0) {
+            historyListUl.innerHTML = "<li>无历史版本</li>";
+        } else {
+            allVersions.forEach((ver, i) => {
+                const li = document.createElement("li");
+                const span = document.createElement("span");
+                span.className = "version-title";
+                const isCurrent = (i === allVersions.length-1);
+                span.innerText = `版本 ${i+1}${isCurrent ? " (当前)" : ""}`;
+                span.onclick = () => {
+                    if (isCurrent) return;
+                    const messages = getCurrentMessages();
+                    if (idx < messages.length) {
+                        messages[idx].content = ver;
+                        if (!messages[idx].history) messages[idx].history = [];
+                        if (!messages[idx].history.includes(ver)) {
+                            messages[idx].history.push(ver);
+                            if (messages[idx].history.length > 20) messages[idx].history.shift();
                         }
-                    };
-                    li.appendChild(span);
-                    historyListUl.appendChild(li);
-                });
-            }
-            msgHistoryModal.style.display = "flex";
-        }
-
-        // 数据加载与迁移
-        function loadData() {
-            const saved = localStorage.getItem("ds_conversations");
-            if (saved) {
-                try {
-                    conversations = JSON.parse(saved);
-                    // 确保每条消息有 history 字段
-                    for (let conv of conversations) {
-                        if (!conv.messages) conv.messages = [];
-                        for (let msg of conv.messages) {
-                            if (!msg.history) msg.history = [];
-                        }
-                        if (!conv.title) conv.title = "新对话";
+                        saveCurrentMessages(messages);
+                        msgHistoryModal.style.display = "none";
                     }
-                } catch(e) { conversations = []; }
-            }
-            if (!conversations.length) {
-                conversations = [{
-                    id: Date.now(),
-                    title: "新对话",
-                    messages: []
-                }];
-            }
-            const savedActive = localStorage.getItem("ds_activeConvId");
-            if (savedActive && conversations.some(c => c.id == savedActive)) activeConvId = parseInt(savedActive);
-            else activeConvId = conversations[0].id;
-            // 如果没有欢迎消息，添加一条
-            const conv = getCurrentConv();
-            if (conv && conv.messages.length === 0) {
-                conv.messages = [{ role: "assistant", content: "✨ 新版已加载：点击消息旁的📜可查看并切换该消息的历史版本。编辑消息时自动填入原内容。", history: [] }];
-                saveAll();
-            }
-            renderMessages();
-            updateTitle();
+                };
+                li.appendChild(span);
+                historyListUl.appendChild(li);
+            });
         }
+        msgHistoryModal.style.display = "flex";
+    }
 
-        // 对话管理
-        function switchConversation(id) {
-            if (isLoading) { alert("请等待完成"); return; }
-            activeConvId = id;
-            saveAll();
-            updateTitle();
-            renderMessages();
+    // ==================== 数据加载与迁移 ====================
+    function loadData() {
+        const saved = localStorage.getItem("ds_conversations");
+        if (saved) {
+            try {
+                conversations = JSON.parse(saved);
+                for (let conv of conversations) {
+                    if (!conv.messages) conv.messages = [];
+                    for (let msg of conv.messages) {
+                        if (!msg.history) msg.history = [];
+                    }
+                    if (!conv.title) conv.title = "新对话";
+                }
+            } catch(e) { conversations = []; }
         }
-        function newConversation() {
-            if (isLoading) return;
-            const newId = Date.now();
-            conversations.push({ id: newId, title: "新对话", messages: [] });
-            activeConvId = newId;
+        if (!conversations.length) {
+            conversations = [{
+                id: Date.now(),
+                title: "新对话",
+                messages: [{ role: "assistant", content: "✨ 新版已加载：点击消息旁的📜可查看并切换该消息的历史版本。编辑消息时自动填入原内容。", history: [] }]
+            }];
+        }
+        const savedActive = localStorage.getItem("ds_activeConvId");
+        if (savedActive && conversations.some(c => c.id == savedActive)) activeConvId = parseInt(savedActive);
+        else activeConvId = conversations[0].id;
+        renderMessages();
+        updateTitle();
+    }
+
+    // ==================== 对话管理 ====================
+    function switchConversation(id) {
+        if (isLoading) { alert("请等待完成"); return; }
+        activeConvId = id;
+        saveAll();
+        updateTitle();
+        renderMessages();
+    }
+    function newConversation() {
+        if (isLoading) return;
+        const newId = Date.now();
+        conversations.push({ id: newId, title: "新对话", messages: [] });
+        activeConvId = newId;
+        saveAll();
+        updateTitle();
+        renderMessages();
+        closeModalPanel();
+    }
+    function deleteConversation(id) {
+        if (conversations.length === 1) { alert("至少保留一个对话"); return; }
+        const idx = conversations.findIndex(c => c.id === id);
+        if (idx !== -1) {
+            conversations.splice(idx, 1);
+            if (activeConvId === id) activeConvId = conversations[0].id;
             saveAll();
             updateTitle();
             renderMessages();
             closeModalPanel();
         }
-        function deleteConversation(id) {
-            if (conversations.length === 1) { alert("至少保留一个对话"); return; }
-            const idx = conversations.findIndex(c => c.id === id);
-            if (idx !== -1) {
-                conversations.splice(idx, 1);
-                if (activeConvId === id) activeConvId = conversations[0].id;
-                saveAll();
-                updateTitle();
-                renderMessages();
-                closeModalPanel();
-            }
-        }
-        function refreshConvList() {
-            convListUl.innerHTML = "";
-            conversations.forEach(c => {
-                const li = document.createElement("li");
-                const span = document.createElement("span");
-                span.className = "conv-title";
-                span.innerText = c.title || "对话";
-                span.onclick = () => { switchConversation(c.id); closeModalPanel(); };
-                const del = document.createElement("button");
-                del.className = "del-conv";
-                del.innerText = "🗑️";
-                del.onclick = (e) => { e.stopPropagation(); if(confirm("删除对话？")) deleteConversation(c.id); };
-                li.appendChild(span);
-                li.appendChild(del);
-                convListUl.appendChild(li);
-            });
-        }
-        function openModalPanel() { refreshConvList(); convModal.style.display = "flex"; }
-        function closeModalPanel() { convModal.style.display = "none"; }
-        function closeHistoryModalPanel() { msgHistoryModal.style.display = "none"; }
+    }
+    function refreshConvList() {
+        convListUl.innerHTML = "";
+        conversations.forEach(c => {
+            const li = document.createElement("li");
+            const span = document.createElement("span");
+            span.className = "conv-title";
+            span.innerText = c.title || "对话";
+            span.onclick = () => { switchConversation(c.id); closeModalPanel(); };
+            const del = document.createElement("button");
+            del.className = "del-conv";
+            del.innerText = "🗑️";
+            del.onclick = (e) => { e.stopPropagation(); if(confirm("删除对话？")) deleteConversation(c.id); };
+            li.appendChild(span);
+            li.appendChild(del);
+            convListUl.appendChild(li);
+        });
+    }
+    function openModalPanel() { refreshConvList(); convModal.style.display = "flex"; }
+    function closeModalPanel() { convModal.style.display = "none"; }
+    function closeHistoryModalPanel() { msgHistoryModal.style.display = "none"; }
 
-        // 备份导出
-        function exportBackup() {
-            const dataStr = JSON.stringify(conversations);
-            const blob = new Blob([dataStr], {type: "application/json"});
-            const a = document.createElement("a");
-            a.href = URL.createObjectURL(blob);
-            a.download = `deepseek_backup_${Date.now()}.json`;
-            a.click();
-            URL.revokeObjectURL(a.href);
-            alert("备份已导出");
-        }
-        function importBackup() {
-            const input = document.createElement("input");
-            input.type = "file";
-            input.accept = "application/json";
-            input.onchange = (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    try {
-                        const imported = JSON.parse(ev.target.result);
-                        if (Array.isArray(imported) && imported.length) {
-                            for (let imp of imported) {
-                                if (!conversations.some(c => c.id === imp.id)) conversations.push(imp);
-                                else if (confirm(`覆盖对话“${imp.title}”?`)) {
-                                    const idx = conversations.findIndex(c => c.id === imp.id);
-                                    conversations[idx] = imp;
-                                }
+    function exportBackup() {
+        const dataStr = JSON.stringify(conversations);
+        const blob = new Blob([dataStr], {type: "application/json"});
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `deepseek_backup_${Date.now()}.json`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+        alert("备份已导出");
+    }
+    function importBackup() {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "application/json";
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                try {
+                    const imported = JSON.parse(ev.target.result);
+                    if (Array.isArray(imported) && imported.length) {
+                        for (let imp of imported) {
+                            if (!conversations.some(c => c.id === imp.id)) conversations.push(imp);
+                            else if (confirm(`覆盖对话“${imp.title}”?`)) {
+                                const idx = conversations.findIndex(c => c.id === imp.id);
+                                conversations[idx] = imp;
                             }
-                            saveAll();
-                            if (!activeConvId || !conversations.some(c => c.id === activeConvId)) activeConvId = conversations[0].id;
-                            renderMessages();
-                            updateTitle();
-                            alert("导入成功");
-                        } else alert("格式错误");
-                    } catch(err) { alert("解析失败"); }
-                };
-                reader.readAsText(file);
+                        }
+                        saveAll();
+                        if (!activeConvId || !conversations.some(c => c.id === activeConvId)) activeConvId = conversations[0].id;
+                        renderMessages();
+                        updateTitle();
+                        alert("导入成功");
+                    } else alert("格式错误");
+                } catch(err) { alert("解析失败"); }
             };
-            input.click();
-        }
+            reader.readAsText(file);
+        };
+        input.click();
+    }
 
-        // 初始化
-        function loadApiKey() {
-            const saved = localStorage.getItem("deepseek_api_key");
-            if (saved) { apiInput.value = saved; currentApiKey = saved; }
+    // ==================== 初始化 ====================
+    function loadApiKey() {
+        const saved = localStorage.getItem("deepseek_api_key");
+        if (saved) { apiInput.value = saved; currentApiKey = saved; }
+    }
+    function saveApiKey() {
+        const newKey = apiInput.value.trim();
+        if (newKey === "") {
+            if (confirm("清除 API Key？")) { localStorage.removeItem("deepseek_api_key"); currentApiKey = ""; alert("已清除"); }
+        } else {
+            localStorage.setItem("deepseek_api_key", newKey);
+            currentApiKey = newKey;
+            alert("✅ API Key 已保存");
         }
-        function saveApiKey() {
-            const newKey = apiInput.value.trim();
-            if (newKey === "") {
-                if (confirm("清除 API Key？")) { localStorage.removeItem("deepseek_api_key"); currentApiKey = ""; alert("已清除"); }
-            } else {
-                localStorage.setItem("deepseek_api_key", newKey);
-                currentApiKey = newKey;
-                alert("✅ API Key 已保存");
+    }
+    function initDeepThinkToggle() {
+        const savedMode = localStorage.getItem("deepthink_mode");
+        if (savedMode === "true") { toggleDeep.checked = true; currentModel = "deepseek-reasoner"; }
+        else { toggleDeep.checked = false; currentModel = "deepseek-chat"; }
+        toggleDeep.addEventListener("change", (e) => {
+            if (e.target.checked) { currentModel = "deepseek-reasoner"; localStorage.setItem("deepthink_mode", "true"); }
+            else { currentModel = "deepseek-chat"; localStorage.setItem("deepthink_mode", "false"); }
+            const tip = document.createElement("div");
+            tip.style.position = "fixed"; tip.style.bottom = "70px"; tip.style.left = "20px";
+            tip.style.background = "#1f7e8c"; tip.style.color = "white"; tip.style.padding = "6px 12px";
+            tip.style.borderRadius = "20px"; tip.style.fontSize = "0.7rem"; tip.style.zIndex = "999";
+            tip.innerText = `已切换至 ${currentModel === "deepseek-reasoner" ? "深度思考(R1)" : "普通模式(V3)"}`;
+            document.body.appendChild(tip);
+            setTimeout(() => tip.remove(), 1500);
+        });
+    }
+    function autoResizeTextarea() {
+        userInput.style.height = 'auto';
+        userInput.style.height = Math.min(100, userInput.scrollHeight) + 'px';
+    }
+    function bindEvents() {
+        sendBtn.addEventListener("click", () => {
+            const text = userInput.value.trim();
+            if (text && !isLoading) {
+                userInput.value = "";
+                userInput.style.height = "auto";
+                sendMessage(text);
             }
-        }
-        function initDeepThinkToggle() {
-            const savedMode = localStorage.getItem("deepthink_mode");
-            if (savedMode === "true") { toggleDeep.checked = true; currentModel = "deepseek-reasoner"; }
-            else { toggleDeep.checked = false; currentModel = "deepseek-chat"; }
-            toggleDeep.addEventListener("change", (e) => {
-                if (e.target.checked) { currentModel = "deepseek-reasoner"; localStorage.setItem("deepthink_mode", "true"); }
-                else { currentModel = "deepseek-chat"; localStorage.setItem("deepthink_mode", "false"); }
-                const tip = document.createElement("div");
-                tip.style.position = "fixed"; tip.style.bottom = "70px"; tip.style.left = "20px";
-                tip.style.background = "#1f7e8c"; tip.style.color = "white"; tip.style.padding = "6px 12px";
-                tip.style.borderRadius = "20px"; tip.style.fontSize = "0.7rem"; tip.style.zIndex = "999";
-                tip.innerText = `已切换至 ${currentModel === "deepseek-reasoner" ? "深度思考(R1)" : "普通模式(V3)"}`;
-                document.body.appendChild(tip);
-                setTimeout(() => tip.remove(), 1500);
-            });
-        }
-        function autoResizeTextarea() {
-            userInput.style.height = 'auto';
-            userInput.style.height = Math.min(100, userInput.scrollHeight) + 'px';
-        }
-        function bindEvents() {
-            sendBtn.addEventListener("click", () => {
+        });
+        saveApiBtn.addEventListener("click", saveApiKey);
+        newConvBtn.addEventListener("click", newConversation);
+        showConvListBtn.addEventListener("click", openModalPanel);
+        closeModalBtn.addEventListener("click", closeModalPanel);
+        modalNewConvBtn.addEventListener("click", () => { newConversation(); closeModalPanel(); });
+        exportBackupBtn.addEventListener("click", exportBackup);
+        importBackupBtn.addEventListener("click", importBackup);
+        closeHistoryModalBtn.addEventListener("click", closeHistoryModalPanel);
+        userInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
                 const text = userInput.value.trim();
                 if (text && !isLoading) {
                     userInput.value = "";
                     userInput.style.height = "auto";
                     sendMessage(text);
                 }
-            });
-            saveApi.addEventListener("click", saveApiKey);
-            newConv.addEventListener("click", newConversation);
-            showConvList.addEventListener("click", openModalPanel);
-            closeModalBtn.addEventListener("click", closeModalPanel);
-            modalNewConv.addEventListener("click", () => { newConversation(); closeModalPanel(); });
-            exportBtn.addEventListener("click", exportBackup);
-            importBtn.addEventListener("click", importBackup);
-            closeHistoryModal.addEventListener("click", closeHistoryModalPanel);
-            userInput.addEventListener("keydown", (e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    const text = userInput.value.trim();
-                    if (text && !isLoading) {
-                        userInput.value = "";
-                        userInput.style.height = "auto";
-                        sendMessage(text);
-                    }
-                }
-            });
-            userInput.addEventListener("input", autoResizeTextarea);
-            window.addEventListener("click", (e) => { if (e.target === convModal) closeModalPanel(); if (e.target === msgHistoryModal) closeHistoryModalPanel(); });
-        }
+            }
+        });
+        userInput.addEventListener("input", autoResizeTextarea);
+        window.addEventListener("click", (e) => { if (e.target === convModal) closeModalPanel(); if (e.target === msgHistoryModal) closeHistoryModalPanel(); });
+    }
 
-        function bootstrap() {
-            loadApiKey();
-            loadData();
-            initDeepThinkToggle();
-            bindEvents();
-        }
-        bootstrap();
-    })();
+    function bootstrap() {
+        loadApiKey();
+        loadData();
+        initDeepThinkToggle();
+        bindEvents();
+    }
+    bootstrap();
+})();
 </script>
 </body>
 </html>
