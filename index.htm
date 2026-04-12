@@ -3,299 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>DeepSeek 对话历史版本（支持撤销/恢复+备份）</title>
+    <title>DeepSeek 消息级历史版本 · 完美编辑</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-        }
-        body {
-            background: #e9eef4;
-            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 0;
-        }
-        .app {
-            max-width: 100%;
-            width: 100%;
-            background: white;
-            border-radius: 0;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-        }
-        .top-bar {
-            background: #ffffffdd;
-            backdrop-filter: blur(12px);
-            padding: 12px 16px;
-            border-bottom: 1px solid #eef2f0;
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 10px;
-            justify-content: space-between;
-        }
-        .conv-control {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            background: #f0f2f5;
-            border-radius: 40px;
-            padding: 4px 12px;
-            flex-wrap: wrap;
-        }
-        .conv-name {
-            font-weight: 600;
-            font-size: 0.9rem;
-            color: #1f5e6e;
-            max-width: 150px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .icon-btn {
-            background: transparent;
-            border: none;
-            font-size: 1.2rem;
-            cursor: pointer;
-            padding: 6px;
-            border-radius: 30px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 32px;
-            height: 32px;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { background: #e9eef4; font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 0; }
+        .app { max-width: 100%; width: 100%; background: white; display: flex; flex-direction: column; height: 100vh; }
+        .top-bar { background: #ffffffdd; backdrop-filter: blur(12px); padding: 12px 16px; border-bottom: 1px solid #eef2f0; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; justify-content: space-between; }
+        .conv-control { display: flex; align-items: center; gap: 8px; background: #f0f2f5; border-radius: 40px; padding: 4px 12px; flex-wrap: wrap; }
+        .conv-name { font-weight: 600; font-size: 0.9rem; color: #1f5e6e; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .icon-btn { background: transparent; border: none; font-size: 1.2rem; cursor: pointer; padding: 6px; border-radius: 30px; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; }
         .icon-btn:active { background: #e0e4ea; }
-        .history-nav { display: flex; gap: 4px; background: #f0f2f5; border-radius: 40px; padding: 2px 8px; }
         .api-section { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-        .api-input {
-            background: #f0f2f5;
-            border: 1px solid #dce3ec;
-            border-radius: 40px;
-            padding: 6px 12px;
-            font-size: 0.7rem;
-            width: 140px;
-            font-family: monospace;
-        }
-        .small-btn {
-            background: #eef2f7;
-            border: none;
-            border-radius: 30px;
-            padding: 5px 12px;
-            font-size: 0.7rem;
-            cursor: pointer;
-        }
-        .mode-switch {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            background: #eef2f7;
-            padding: 0 10px;
-            border-radius: 40px;
-            height: 32px;
-            font-size: 0.7rem;
-        }
-        .messages-container {
-            flex: 1;
-            overflow-y: auto;
-            padding: 16px;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-            background: #fefefe;
-        }
-        .message {
-            display: flex;
-            flex-direction: column;
-            max-width: 85%;
-            position: relative;
-        }
+        .api-input { background: #f0f2f5; border: 1px solid #dce3ec; border-radius: 40px; padding: 6px 12px; font-size: 0.7rem; width: 140px; font-family: monospace; }
+        .small-btn { background: #eef2f7; border: none; border-radius: 30px; padding: 5px 12px; font-size: 0.7rem; cursor: pointer; }
+        .mode-switch { display: flex; align-items: center; gap: 6px; background: #eef2f7; padding: 0 10px; border-radius: 40px; height: 32px; font-size: 0.7rem; }
+        .messages-container { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; background: #fefefe; }
+        .message { display: flex; flex-direction: column; max-width: 85%; position: relative; }
         .user-message { align-self: flex-end; }
         .assistant-message { align-self: flex-start; }
-        .bubble {
-            padding: 10px 14px;
-            border-radius: 22px;
-            line-height: 1.45;
-            font-size: 0.9rem;
-            word-wrap: break-word;
-            white-space: pre-wrap;
-            position: relative;
-        }
-        .user-message .bubble {
-            background: #1f7e8c;
-            color: white;
-            border-bottom-right-radius: 6px;
-        }
-        .assistant-message .bubble {
-            background: #eef2fa;
-            color: #1a2c3e;
-            border-bottom-left-radius: 6px;
-        }
-        .message-actions {
-            display: flex;
-            gap: 12px;
-            margin-top: 4px;
-            margin-left: 12px;
-            font-size: 0.65rem;
-        }
-        .action-btn {
-            background: transparent;
-            border: none;
-            color: #6c7a91;
-            cursor: pointer;
-            padding: 4px 6px;
-            border-radius: 20px;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-        }
+        .bubble { padding: 10px 14px; border-radius: 22px; line-height: 1.45; font-size: 0.9rem; word-wrap: break-word; white-space: pre-wrap; position: relative; }
+        .user-message .bubble { background: #1f7e8c; color: white; border-bottom-right-radius: 6px; }
+        .assistant-message .bubble { background: #eef2fa; color: #1a2c3e; border-bottom-left-radius: 6px; }
+        .message-actions { display: flex; gap: 8px; margin-top: 4px; margin-left: 12px; font-size: 0.65rem; }
+        .action-btn { background: transparent; border: none; color: #6c7a91; cursor: pointer; padding: 4px 6px; border-radius: 20px; display: inline-flex; align-items: center; gap: 4px; }
         .action-btn:active { background: #e2e8f0; }
-        .message-time {
-            font-size: 0.55rem;
-            color: #8d9aae;
-            margin-top: 4px;
-            margin-left: 12px;
-        }
-        .loading-bubble {
-            background: #eef2fa;
-            padding: 10px 16px;
-            border-radius: 24px;
-            display: flex;
-            gap: 6px;
-            width: fit-content;
-        }
-        .dot {
-            width: 8px;
-            height: 8px;
-            background: #8f9bb3;
-            border-radius: 50%;
-            animation: wave 1.2s infinite;
-        }
-        @keyframes wave {
-            0%,60%,100% { transform: translateY(0); opacity: 0.5; }
-            30% { transform: translateY(-5px); opacity: 1; }
-        }
-        .input-area {
-            background: white;
-            border-top: 1px solid #eef2f0;
-            padding: 12px 16px 16px;
-            display: flex;
-            gap: 10px;
-            align-items: flex-end;
-        }
-        .input-wrapper {
-            flex: 1;
-            background: #f4f7fb;
-            border-radius: 32px;
-            padding: 8px 16px;
-            border: 1px solid #e2e8f0;
-        }
-        textarea {
-            width: 100%;
-            border: none;
-            background: transparent;
-            resize: none;
-            font-size: 0.9rem;
-            font-family: inherit;
-            outline: none;
-            max-height: 100px;
-        }
-        .send-btn {
-            background: #1f7e8c;
-            border: none;
-            width: 44px;
-            height: 44px;
-            border-radius: 44px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            color: white;
-            font-size: 1.2rem;
-        }
+        .message-time { font-size: 0.55rem; color: #8d9aae; margin-top: 4px; margin-left: 12px; }
+        .loading-bubble { background: #eef2fa; padding: 10px 16px; border-radius: 24px; display: flex; gap: 6px; width: fit-content; }
+        .dot { width: 8px; height: 8px; background: #8f9bb3; border-radius: 50%; animation: wave 1.2s infinite; }
+        @keyframes wave { 0%,60%,100% { transform: translateY(0); opacity: 0.5; } 30% { transform: translateY(-5px); opacity: 1; } }
+        .input-area { background: white; border-top: 1px solid #eef2f0; padding: 12px 16px 16px; display: flex; gap: 10px; align-items: flex-end; }
+        .input-wrapper { flex: 1; background: #f4f7fb; border-radius: 32px; padding: 8px 16px; border: 1px solid #e2e8f0; }
+        textarea { width: 100%; border: none; background: transparent; resize: none; font-size: 0.9rem; font-family: inherit; outline: none; max-height: 100px; }
+        .send-btn { background: #1f7e8c; border: none; width: 44px; height: 44px; border-radius: 44px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; font-size: 1.2rem; }
         .send-btn.disabled { opacity: 0.5; pointer-events: none; }
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-        .modal-content {
-            background: white;
-            width: 85%;
-            max-width: 320px;
-            border-radius: 28px;
-            padding: 20px;
-            max-height: 70%;
-            overflow-y: auto;
-        }
-        .modal-header {
-            font-weight: 600;
-            margin-bottom: 12px;
-            display: flex;
-            justify-content: space-between;
-        }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; width: 85%; max-width: 320px; border-radius: 28px; padding: 20px; max-height: 70%; overflow-y: auto; }
+        .modal-header { font-weight: 600; margin-bottom: 12px; display: flex; justify-content: space-between; }
         .conv-list, .version-list { list-style: none; }
-        .conv-list li, .version-list li {
-            padding: 12px 8px;
-            border-bottom: 1px solid #eef2f0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .conv-title, .version-title {
-            cursor: pointer;
-            flex: 1;
-            font-size: 0.9rem;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        .del-conv {
-            background: none;
-            border: none;
-            font-size: 1.2rem;
-            cursor: pointer;
-            color: #c23d3d;
-            padding: 0 8px;
-        }
-        .new-conv-btn, .backup-btn {
-            background: #1f7e8c;
-            color: white;
-            border: none;
-            border-radius: 40px;
-            padding: 8px;
-            width: 100%;
-            margin-top: 12px;
-            font-size: 0.9rem;
-            cursor: pointer;
-        }
-        .backup-btn { background: #4a6a7a; }
-        .footer-note {
-            font-size: 0.6rem;
-            text-align: center;
-            padding: 8px;
-            color: #95a5bc;
-            background: #ffffffcc;
-        }
-        @media (max-width: 550px) {
-            .api-input { width: 110px; }
-            .conv-name { max-width: 120px; }
-            .message-actions { gap: 6px; }
-        }
+        .conv-list li, .version-list li { padding: 12px 8px; border-bottom: 1px solid #eef2f0; display: flex; justify-content: space-between; align-items: center; }
+        .conv-title, .version-title { cursor: pointer; flex: 1; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .del-conv { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #c23d3d; padding: 0 8px; }
+        .new-conv-btn { background: #1f7e8c; color: white; border: none; border-radius: 40px; padding: 8px; width: 100%; margin-top: 12px; font-size: 0.9rem; cursor: pointer; }
+        .footer-note { font-size: 0.6rem; text-align: center; padding: 8px; color: #95a5bc; background: #ffffffcc; }
+        @media (max-width: 550px) { .api-input { width: 110px; } .conv-name { max-width: 120px; } }
     </style>
 </head>
 <body>
@@ -305,13 +55,8 @@
             <button id="showConvListBtn" class="icon-btn">📋</button>
             <span id="currentConvName" class="conv-name">加载中...</span>
             <button id="newConvBtn" class="icon-btn">➕</button>
-            <div class="history-nav">
-                <button id="undoVersionBtn" class="icon-btn" title="上一个版本">⏪</button>
-                <button id="redoVersionBtn" class="icon-btn" title="下一个版本">⏩</button>
-                <button id="showVersionListBtn" class="icon-btn" title="历史版本列表">🕘</button>
-            </div>
-            <button id="exportBackupBtn" class="small-btn" title="导出所有对话">💾 备份</button>
-            <button id="importBackupBtn" class="small-btn" title="导入备份">📂 恢复</button>
+            <button id="exportBackupBtn" class="small-btn">💾 备份</button>
+            <button id="importBackupBtn" class="small-btn">📂 恢复</button>
         </div>
         <div class="api-section">
             <input type="password" id="apiKeyInput" class="api-input" placeholder="API Key">
@@ -322,620 +67,567 @@
             </div>
         </div>
     </div>
-
     <div class="messages-container" id="messagesContainer">
         <div class="message assistant-message">
-            <div class="bubble">✨ 欢迎！现在支持历史版本管理和备份。<br>📌 每次编辑/重试/发送都会自动保存快照。使用⏪⏩浏览历史，点击💾备份可导出所有对话。</div>
+            <div class="bubble">✨ 新版已加载：点击消息旁的📜可查看并切换该消息的历史版本。编辑消息时自动填入原内容。</div>
         </div>
     </div>
-
     <div class="input-area">
         <div class="input-wrapper">
-            <textarea id="userInput" rows="1" placeholder="输入消息... (Enter 发送, Shift+Enter 换行)"></textarea>
+            <textarea id="userInput" rows="1" placeholder="输入消息... (Enter 发送)"></textarea>
         </div>
         <button id="sendButton" class="send-btn">➤</button>
     </div>
-    <div class="footer-note">
-        🔒 API Key 仅存本地 | 自动保存历史版本 | 支持导出/导入备份
-    </div>
+    <div class="footer-note">🔒 API Key 仅存本地 | 每条消息独立历史版本</div>
 </div>
 
 <!-- 对话列表模态框 -->
-<div id="convModal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <span>📁 我的对话</span>
-            <button id="closeModalBtn" class="icon-btn" style="background:none;">✖️</button>
-        </div>
-        <ul id="convListUl" class="conv-list"></ul>
-        <button id="modalNewConvBtn" class="new-conv-btn">➕ 新建对话</button>
-    </div>
-</div>
-
-<!-- 版本列表模态框 -->
-<div id="versionModal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <span>🕘 历史版本</span>
-            <button id="closeVersionModalBtn" class="icon-btn" style="background:none;">✖️</button>
-        </div>
-        <ul id="versionListUl" class="version-list"></ul>
-    </div>
-</div>
+<div id="convModal" class="modal"><div class="modal-content"><div class="modal-header"><span>📁 我的对话</span><button id="closeModalBtn" class="icon-btn">✖️</button></div><ul id="convListUl"></ul><button id="modalNewConvBtn" class="new-conv-btn">➕ 新建对话</button></div></div>
+<!-- 消息历史版本模态框 -->
+<div id="msgHistoryModal" class="modal"><div class="modal-content"><div class="modal-header"><span>📜 消息历史版本</span><button id="closeHistoryModalBtn" class="icon-btn">✖️</button></div><ul id="historyListUl" class="version-list"></ul></div></div>
 
 <script>
-    // ==================== 配置 ====================
-    const DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions";
-    const SYSTEM_MESSAGE = { role: "system", content: "你是DeepSeek助手，现在扮演用户指定的角色进行对话。请保持角色一致性，根据上下文自然回复。使用中文。" };
+    (function(){
+        // ---------- 配置 ----------
+        const DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions";
+        const SYSTEM_MESSAGE = { role: "system", content: "你是DeepSeek助手，扮演角色进行对话，保持一致性，使用中文。" };
+        
+        // 数据结构：每个对话包含一个消息数组，每条消息包含 { role, content, history }，history是该消息的历史版本数组（字符串）
+        let conversations = [];
+        let activeConvId = null;
+        let currentApiKey = "";
+        let currentModel = "deepseek-chat";
+        let isLoading = false;
 
-    let conversations = [];
-    let activeConvId = null;
-    let currentApiKey = "";
-    let currentModel = "deepseek-chat";
-    let isLoading = false;
+        // DOM
+        const msgContainer = document.getElementById("messagesContainer");
+        const userInput = document.getElementById("userInput");
+        const sendBtn = document.getElementById("sendButton");
+        const apiInput = document.getElementById("apiKeyInput");
+        const saveApi = document.getElementById("saveApiBtn");
+        const toggleDeep = document.getElementById("deepThinkToggle");
+        const convNameSpan = document.getElementById("currentConvName");
+        const showConvList = document.getElementById("showConvListBtn");
+        const newConv = document.getElementById("newConvBtn");
+        const exportBtn = document.getElementById("exportBackupBtn");
+        const importBtn = document.getElementById("importBackupBtn");
+        const convModal = document.getElementById("convModal");
+        const msgHistoryModal = document.getElementById("msgHistoryModal");
+        const convListUl = document.getElementById("convListUl");
+        const closeModalBtn = document.getElementById("closeModalBtn");
+        const modalNewConv = document.getElementById("modalNewConvBtn");
+        const closeHistoryModal = document.getElementById("closeHistoryModalBtn");
+        const historyListUl = document.getElementById("historyListUl");
 
-    // DOM 元素
-    const messagesContainer = document.getElementById("messagesContainer");
-    const userInputEl = document.getElementById("userInput");
-    const sendButton = document.getElementById("sendButton");
-    const apiKeyInput = document.getElementById("apiKeyInput");
-    const saveApiBtn = document.getElementById("saveApiBtn");
-    const deepThinkToggle = document.getElementById("deepThinkToggle");
-    const currentConvNameSpan = document.getElementById("currentConvName");
-    const showConvListBtn = document.getElementById("showConvListBtn");
-    const newConvBtn = document.getElementById("newConvBtn");
-    const undoVersionBtn = document.getElementById("undoVersionBtn");
-    const redoVersionBtn = document.getElementById("redoVersionBtn");
-    const showVersionListBtn = document.getElementById("showVersionListBtn");
-    const exportBackupBtn = document.getElementById("exportBackupBtn");
-    const importBackupBtn = document.getElementById("importBackupBtn");
-    const convModal = document.getElementById("convModal");
-    const versionModal = document.getElementById("versionModal");
-    const convListUl = document.getElementById("convListUl");
-    const closeModalBtn = document.getElementById("closeModalBtn");
-    const modalNewConvBtn = document.getElementById("modalNewConvBtn");
-    const closeVersionModalBtn = document.getElementById("closeVersionModalBtn");
-    const versionListUl = document.getElementById("versionListUl");
+        // 辅助函数
+        function saveAll() {
+            localStorage.setItem("ds_conversations", JSON.stringify(conversations));
+            localStorage.setItem("ds_activeConvId", activeConvId);
+        }
 
-    // ==================== 辅助函数 ====================
-    function getCurrentConv() {
-        return conversations.find(c => c.id === activeConvId);
-    }
+        function getCurrentConv() {
+            return conversations.find(c => c.id === activeConvId);
+        }
 
-    function saveAllData() {
-        localStorage.setItem("ds_conversations", JSON.stringify(conversations));
-        localStorage.setItem("ds_activeConvId", activeConvId);
-    }
+        function getCurrentMessages() {
+            const conv = getCurrentConv();
+            if (!conv) return [];
+            return conv.messages || [];
+        }
 
-    // 数据迁移：将旧版 messages 结构转换为 versionStack
-    function migrateOldData(oldConvs) {
-        let migrated = false;
-        for (let conv of oldConvs) {
-            if (!conv.versionStack && conv.messages && Array.isArray(conv.messages)) {
-                // 确保包含 system 消息
-                let msgs = conv.messages;
-                if (msgs.length === 0 || msgs[0]?.role !== "system") {
-                    msgs = [SYSTEM_MESSAGE, ...msgs];
+        function saveCurrentMessages(messages) {
+            const conv = getCurrentConv();
+            if (conv) {
+                conv.messages = messages;
+                // 自动生成标题（取第一条用户消息前20字）
+                const firstUser = messages.find(m => m.role === "user");
+                if (firstUser && (conv.title === "新对话" || !conv.title)) {
+                    let newTitle = firstUser.content.slice(0, 20);
+                    if (newTitle.length < 1) newTitle = "对话";
+                    conv.title = newTitle;
                 }
-                conv.versionStack = [JSON.parse(JSON.stringify(msgs))];
-                conv.currentVersionIndex = 0;
-                delete conv.messages;
-                migrated = true;
-            } else if (!conv.versionStack) {
-                conv.versionStack = [[SYSTEM_MESSAGE]];
-                conv.currentVersionIndex = 0;
-                migrated = true;
-            }
-            if (conv.currentVersionIndex === undefined) conv.currentVersionIndex = 0;
-        }
-        return migrated;
-    }
-
-    function loadAllData() {
-        const savedConvs = localStorage.getItem("ds_conversations");
-        if (savedConvs) {
-            try {
-                conversations = JSON.parse(savedConvs);
-                const migrated = migrateOldData(conversations);
-                if (migrated) saveAllData(); // 立即保存迁移后的格式
-            } catch(e) {
-                console.error("解析失败", e);
-                conversations = [];
+                saveAll();
+                renderMessages();
+                updateTitle();
             }
         }
-        if (!conversations || conversations.length === 0) {
-            // 尝试读取旧版单独存储的 messages（更早的版本）
-            const oldMessages = localStorage.getItem("ds_messages");
-            if (oldMessages) {
-                try {
-                    let msgs = JSON.parse(oldMessages);
-                    if (!msgs.some(m => m.role === "system")) msgs.unshift(SYSTEM_MESSAGE);
-                    const newConv = {
-                        id: Date.now(),
-                        title: "恢复的对话",
-                        versionStack: [msgs],
-                        currentVersionIndex: 0
-                    };
-                    conversations = [newConv];
-                    localStorage.removeItem("ds_messages"); // 清理旧key
-                    saveAllData();
-                } catch(e) {}
+
+        // 添加或更新消息的历史记录
+        function addMessageHistory(msgIndex, newContent) {
+            const messages = getCurrentMessages();
+            if (msgIndex >= messages.length) return;
+            const msg = messages[msgIndex];
+            if (!msg.history) msg.history = [];
+            // 避免重复添加相同内容
+            if (msg.history[msg.history.length-1] !== msg.content) {
+                msg.history.push(msg.content);
+                if (msg.history.length > 20) msg.history.shift();
             }
+            msg.content = newContent;
+            saveCurrentMessages(messages);
         }
-        if (conversations.length === 0) {
-            conversations = [{
-                id: Date.now(),
-                title: "新对话",
-                versionStack: [[SYSTEM_MESSAGE]],
-                currentVersionIndex: 0
-            }];
-        }
-        const savedActive = localStorage.getItem("ds_activeConvId");
-        if (savedActive && conversations.some(c => c.id == savedActive)) {
-            activeConvId = parseInt(savedActive);
-        } else {
-            activeConvId = conversations[0].id;
-        }
-        updateCurrentTitle();
-    }
 
-    function getCurrentMessages() {
-        const conv = getCurrentConv();
-        if (!conv || conv.versionStack.length === 0) return [SYSTEM_MESSAGE];
-        return conv.versionStack[conv.currentVersionIndex];
-    }
-
-    function saveSnapshot(conv, newMessages) {
-        if (!conv) return;
-        if (conv.currentVersionIndex < conv.versionStack.length - 1) {
-            conv.versionStack = conv.versionStack.slice(0, conv.currentVersionIndex + 1);
-        }
-        conv.versionStack.push(JSON.parse(JSON.stringify(newMessages)));
-        conv.currentVersionIndex = conv.versionStack.length - 1;
-        if (conv.versionStack.length > 50) {
-            conv.versionStack.shift();
-            conv.currentVersionIndex--;
-        }
-        saveAllData();
-    }
-
-    function replaceCurrentVersion(messages) {
-        const conv = getCurrentConv();
-        if (!conv) return;
-        conv.versionStack[conv.currentVersionIndex] = JSON.parse(JSON.stringify(messages));
-        saveAllData();
-        renderMessages();
-    }
-
-    function restoreVersion(conv, index) {
-        if (!conv || index < 0 || index >= conv.versionStack.length) return false;
-        conv.currentVersionIndex = index;
-        saveAllData();
-        renderMessages();
-        updateCurrentTitle();
-        return true;
-    }
-
-    // ==================== API 调用 ====================
-    async function callAPIWithMessages(messages) {
-        if (!currentApiKey) throw new Error("❌ 请先保存 API Key");
-        const response = await fetch(DEEPSEEK_API_URL, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${currentApiKey}`
-            },
-            body: JSON.stringify({
-                model: currentModel,
-                messages: messages,
-                temperature: 0.7,
-                max_tokens: 2000,
-                stream: false
-            })
-        });
-        if (!response.ok) {
-            let errMsg = `HTTP ${response.status}`;
-            try { const errJson = await response.json(); errMsg = errJson.error?.message || errMsg; } catch(e) {}
-            throw new Error(errMsg);
-        }
-        const data = await response.json();
-        if (!data.choices?.[0]?.message?.content) throw new Error("回复为空");
-        return data.choices[0].message.content;
-    }
-
-    // 发送新消息
-    async function sendMessageWithHistory(text) {
-        if (isLoading) return;
-        const conv = getCurrentConv();
-        if (!conv) return;
-        const oldMsgs = getCurrentMessages();
-        saveSnapshot(conv, oldMsgs);
-        const newUserMsg = { role: "user", content: text };
-        const updatedMsgs = [...oldMsgs, newUserMsg];
-        replaceCurrentVersion(updatedMsgs);
-        isLoading = true;
-        sendButton.classList.add("disabled");
-        showLoading();
-        try {
-            const reply = await callAPIWithMessages(updatedMsgs);
-            hideLoading();
-            const finalMsgs = [...updatedMsgs, { role: "assistant", content: reply }];
-            replaceCurrentVersion(finalMsgs);
-        } catch (err) {
-            hideLoading();
-            const errorMsg = err.message || "调用失败";
-            const errMsgs = [...updatedMsgs, { role: "assistant", content: `⚠️ 错误：${errorMsg}` }];
-            replaceCurrentVersion(errMsgs);
-            if (errorMsg.includes("Insufficient Balance")) alert("API 余额不足");
-            else if (errorMsg.includes("API Key")) alert("API Key 无效");
-        } finally {
-            isLoading = false;
-            sendButton.classList.remove("disabled");
-        }
-    }
-
-    // 编辑用户消息
-    async function editUserMessage(msgIndex, oldContent) {
-        if (isLoading) return;
-        const newContent = prompt("编辑消息内容:", oldContent);
-        if (newContent === null || newContent.trim() === "") return;
-        const conv = getCurrentConv();
-        const currentMsgs = getCurrentMessages();
-        saveSnapshot(conv, currentMsgs);
-        const displayMsgs = currentMsgs.filter(m => m.role !== "system");
-        if (msgIndex >= displayMsgs.length) return;
-        let realIndex = -1, userCount = -1;
-        for (let i = 0; i < currentMsgs.length; i++) {
-            if (currentMsgs[i].role !== "system") userCount++;
-            if (userCount === msgIndex && currentMsgs[i].role === "user") {
-                realIndex = i;
-                break;
+        // 渲染消息列表
+        function renderMessages() {
+            const messages = getCurrentMessages();
+            msgContainer.innerHTML = "";
+            if (messages.length === 0) {
+                msgContainer.innerHTML = `<div class="message assistant-message"><div class="bubble">开始对话吧～</div></div>`;
+                return;
             }
-        }
-        if (realIndex === -1) return;
-        const newMsgs = currentMsgs.slice(0, realIndex);
-        newMsgs.push({ role: "user", content: newContent.trim() });
-        replaceCurrentVersion(newMsgs);
-        await regenerateAfterEdit(newMsgs);
-    }
-
-    async function regenerateAfterEdit(messagesWithoutAssistant) {
-        if (isLoading) return;
-        isLoading = true;
-        sendButton.classList.add("disabled");
-        showLoading();
-        try {
-            const reply = await callAPIWithMessages(messagesWithoutAssistant);
-            hideLoading();
-            const finalMsgs = [...messagesWithoutAssistant, { role: "assistant", content: reply }];
-            replaceCurrentVersion(finalMsgs);
-        } catch (err) {
-            hideLoading();
-            const errorMsg = err.message || "调用失败";
-            const errMsgs = [...messagesWithoutAssistant, { role: "assistant", content: `⚠️ 错误：${errorMsg}` }];
-            replaceCurrentVersion(errMsgs);
-        } finally {
-            isLoading = false;
-            sendButton.classList.remove("disabled");
-        }
-    }
-
-    async function regenerateLastAssistant() {
-        if (isLoading) return;
-        const conv = getCurrentConv();
-        const currentMsgs = getCurrentMessages();
-        let lastIdx = -1;
-        for (let i = currentMsgs.length - 1; i >= 0; i--) {
-            if (currentMsgs[i].role === "assistant") { lastIdx = i; break; }
-        }
-        if (lastIdx === -1) { alert("没有可重新生成的助手消息"); return; }
-        saveSnapshot(conv, currentMsgs);
-        const newMsgs = currentMsgs.slice(0, lastIdx);
-        replaceCurrentVersion(newMsgs);
-        await regenerateAfterEdit(newMsgs);
-    }
-
-    // ==================== 渲染 ====================
-    function renderMessages() {
-        const messages = getCurrentMessages();
-        const displayMsgs = messages.filter(m => m.role !== "system");
-        messagesContainer.innerHTML = "";
-        if (displayMsgs.length === 0) {
-            const emptyDiv = document.createElement("div");
-            emptyDiv.className = "message assistant-message";
-            emptyDiv.innerHTML = `<div class="bubble">💬 暂无消息，开始对话～</div>`;
-            messagesContainer.appendChild(emptyDiv);
-        } else {
-            displayMsgs.forEach((msg, idx) => {
-                const msgDiv = document.createElement("div");
-                msgDiv.className = `message ${msg.role === "user" ? "user-message" : "assistant-message"}`;
+            messages.forEach((msg, idx) => {
+                const isUser = msg.role === "user";
+                const div = document.createElement("div");
+                div.className = `message ${isUser ? "user-message" : "assistant-message"}`;
                 const bubble = document.createElement("div");
                 bubble.className = "bubble";
                 bubble.innerText = msg.content;
-                msgDiv.appendChild(bubble);
+                div.appendChild(bubble);
                 const actions = document.createElement("div");
                 actions.className = "message-actions";
+                // 复制按钮
                 const copyBtn = document.createElement("button");
                 copyBtn.className = "action-btn";
                 copyBtn.innerHTML = "📋 复制";
                 copyBtn.onclick = async (e) => {
                     e.stopPropagation();
                     await navigator.clipboard.writeText(msg.content);
-                    copyBtn.innerHTML = "✅ 已复制";
+                    copyBtn.innerHTML = "✅";
                     setTimeout(() => copyBtn.innerHTML = "📋 复制", 1000);
                 };
                 actions.appendChild(copyBtn);
-                if (msg.role === "user") {
+                // 历史版本按钮（只要有历史版本或当前内容可保存）
+                const historyBtn = document.createElement("button");
+                historyBtn.className = "action-btn";
+                historyBtn.innerHTML = "📜 历史";
+                historyBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    showMessageHistory(idx, msg.content, msg.history || []);
+                };
+                actions.appendChild(historyBtn);
+                // 编辑按钮（仅用户消息）
+                if (isUser) {
                     const editBtn = document.createElement("button");
                     editBtn.className = "action-btn";
                     editBtn.innerHTML = "✏️ 编辑";
-                    editBtn.onclick = (e) => { e.stopPropagation(); editUserMessage(idx, msg.content); };
+                    editBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        editUserMessage(idx, msg.content);
+                    };
                     actions.appendChild(editBtn);
                 }
-                if (msg.role === "assistant") {
-                    const lastAssIdx = displayMsgs.reduce((last, m, i) => m.role === "assistant" ? i : last, -1);
-                    if (idx === lastAssIdx) {
+                // 重新生成按钮（仅最后一条AI消息）
+                if (!isUser) {
+                    const lastAssistantIdx = messages.reduce((last, m, i) => m.role === "assistant" ? i : last, -1);
+                    if (idx === lastAssistantIdx) {
                         const regenBtn = document.createElement("button");
                         regenBtn.className = "action-btn";
                         regenBtn.innerHTML = "🔄 重新生成";
-                        regenBtn.onclick = (e) => { e.stopPropagation(); regenerateLastAssistant(); };
+                        regenBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            regenerateLastAssistant();
+                        };
                         actions.appendChild(regenBtn);
                     }
                 }
-                msgDiv.appendChild(actions);
+                div.appendChild(actions);
                 const timeSpan = document.createElement("div");
                 timeSpan.className = "message-time";
                 timeSpan.innerText = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                msgDiv.appendChild(timeSpan);
-                messagesContainer.appendChild(msgDiv);
+                div.appendChild(timeSpan);
+                msgContainer.appendChild(div);
+            });
+            msgContainer.scrollTop = msgContainer.scrollHeight;
+        }
+
+        function updateTitle() {
+            const conv = getCurrentConv();
+            convNameSpan.innerText = conv ? (conv.title || "对话") : "对话";
+        }
+
+        function showLoading() {
+            let ld = document.getElementById("loadingMsg");
+            if (!ld) {
+                ld = document.createElement("div");
+                ld.className = "message assistant-message";
+                ld.id = "loadingMsg";
+                ld.innerHTML = `<div class="loading-bubble"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>`;
+                msgContainer.appendChild(ld);
+                msgContainer.scrollTop = msgContainer.scrollHeight;
+            }
+        }
+        function hideLoading() { document.getElementById("loadingMsg")?.remove(); }
+
+        // API调用（带超时）
+        async function callAPI(messages) {
+            if (!currentApiKey) throw new Error("请先保存 API Key");
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
+            try {
+                const res = await fetch(DEEPSEEK_API_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${currentApiKey}` },
+                    body: JSON.stringify({ model: currentModel, messages, temperature: 0.7, max_tokens: 2000, stream: false }),
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                if (!res.ok) {
+                    let err = `HTTP ${res.status}`;
+                    try { const j = await res.json(); err = j.error?.message || err; } catch(e) {}
+                    throw new Error(err);
+                }
+                const data = await res.json();
+                if (!data.choices?.[0]?.message?.content) throw new Error("回复为空");
+                return data.choices[0].message.content;
+            } catch (err) {
+                clearTimeout(timeoutId);
+                throw err;
+            }
+        }
+
+        // 发送新消息
+        async function sendMessage(text) {
+            if (isLoading) { alert("请等待上一条回复完成"); return; }
+            const conv = getCurrentConv();
+            if (!conv) return;
+            const oldMsgs = getCurrentMessages();
+            const newUserMsg = { role: "user", content: text, history: [] };
+            const updated = [...oldMsgs, newUserMsg];
+            saveCurrentMessages(updated);
+            isLoading = true;
+            sendBtn.classList.add("disabled");
+            showLoading();
+            try {
+                // 构建API请求的消息列表（不含history字段）
+                const apiMessages = updated.map(m => ({ role: m.role, content: m.content }));
+                const reply = await callAPI(apiMessages);
+                hideLoading();
+                const newAssistantMsg = { role: "assistant", content: reply, history: [] };
+                const final = [...updated, newAssistantMsg];
+                saveCurrentMessages(final);
+            } catch (err) {
+                hideLoading();
+                const errMsg = err.message || "调用失败";
+                const errMsgObj = { role: "assistant", content: `⚠️ 错误：${errMsg}`, history: [] };
+                const final = [...updated, errMsgObj];
+                saveCurrentMessages(final);
+                if (errMsg.includes("Insufficient Balance")) alert("余额不足");
+                else if (errMsg.includes("API Key")) alert("API Key 无效");
+            } finally {
+                isLoading = false;
+                sendBtn.classList.remove("disabled");
+            }
+        }
+
+        // 编辑用户消息（预填原内容）
+        async function editUserMessage(idx, oldContent) {
+            if (isLoading) return;
+            const newContent = prompt("编辑消息内容:", oldContent);
+            if (newContent === null || newContent.trim() === "") return;
+            const messages = getCurrentMessages();
+            if (idx >= messages.length) return;
+            // 保存旧内容到历史
+            const msg = messages[idx];
+            if (!msg.history) msg.history = [];
+            if (msg.history[msg.history.length-1] !== msg.content) {
+                msg.history.push(msg.content);
+                if (msg.history.length > 20) msg.history.shift();
+            }
+            msg.content = newContent.trim();
+            // 删除该消息之后的所有消息（因为修改后需要重新生成后续）
+            const newMessages = messages.slice(0, idx+1);
+            saveCurrentMessages(newMessages);
+            // 重新生成AI回复（基于新的消息列表）
+            await regenerateAfterEdit(newMessages);
+        }
+
+        async function regenerateAfterEdit(messagesWithoutAssistant) {
+            if (isLoading) return;
+            isLoading = true;
+            sendBtn.classList.add("disabled");
+            showLoading();
+            try {
+                const apiMessages = messagesWithoutAssistant.map(m => ({ role: m.role, content: m.content }));
+                const reply = await callAPI(apiMessages);
+                hideLoading();
+                const newAssistant = { role: "assistant", content: reply, history: [] };
+                const final = [...messagesWithoutAssistant, newAssistant];
+                saveCurrentMessages(final);
+            } catch (err) {
+                hideLoading();
+                const errMsg = err.message || "调用失败";
+                const errAssistant = { role: "assistant", content: `⚠️ 错误：${errMsg}`, history: [] };
+                const final = [...messagesWithoutAssistant, errAssistant];
+                saveCurrentMessages(final);
+            } finally {
+                isLoading = false;
+                sendBtn.classList.remove("disabled");
+            }
+        }
+
+        async function regenerateLastAssistant() {
+            if (isLoading) return;
+            const messages = getCurrentMessages();
+            let lastAssistantIdx = -1;
+            for (let i = messages.length-1; i>=0; i--) {
+                if (messages[i].role === "assistant") { lastAssistantIdx = i; break; }
+            }
+            if (lastAssistantIdx === -1) { alert("没有可重新生成的消息"); return; }
+            const assistantMsg = messages[lastAssistantIdx];
+            // 保存当前版本到历史
+            if (!assistantMsg.history) assistantMsg.history = [];
+            if (assistantMsg.history[assistantMsg.history.length-1] !== assistantMsg.content) {
+                assistantMsg.history.push(assistantMsg.content);
+                if (assistantMsg.history.length > 20) assistantMsg.history.shift();
+            }
+            // 截断到该消息之前
+            const truncated = messages.slice(0, lastAssistantIdx);
+            saveCurrentMessages(truncated);
+            // 重新生成
+            await regenerateAfterEdit(truncated);
+        }
+
+        // 显示消息历史版本
+        function showMessageHistory(idx, currentContent, historyArray) {
+            historyListUl.innerHTML = "";
+            const allVersions = [...historyArray, currentContent]; // 当前版本在最后
+            if (allVersions.length === 0) {
+                historyListUl.innerHTML = "<li>无历史版本</li>";
+            } else {
+                allVersions.forEach((ver, i) => {
+                    const li = document.createElement("li");
+                    const span = document.createElement("span");
+                    span.className = "version-title";
+                    const isCurrent = (i === allVersions.length-1);
+                    span.innerText = `版本 ${i+1}${isCurrent ? " (当前)" : ""}`;
+                    span.onclick = () => {
+                        if (isCurrent) return;
+                        // 切换消息内容到选中的历史版本
+                        const messages = getCurrentMessages();
+                        if (idx < messages.length) {
+                            messages[idx].content = ver;
+                            // 更新历史数组，确保该版本被标记
+                            if (!messages[idx].history) messages[idx].history = [];
+                            if (!messages[idx].history.includes(ver)) {
+                                messages[idx].history.push(ver);
+                                if (messages[idx].history.length > 20) messages[idx].history.shift();
+                            }
+                            saveCurrentMessages(messages);
+                            msgHistoryModal.style.display = "none";
+                        }
+                    };
+                    li.appendChild(span);
+                    historyListUl.appendChild(li);
+                });
+            }
+            msgHistoryModal.style.display = "flex";
+        }
+
+        // 数据加载与迁移
+        function loadData() {
+            const saved = localStorage.getItem("ds_conversations");
+            if (saved) {
+                try {
+                    conversations = JSON.parse(saved);
+                    // 确保每条消息有 history 字段
+                    for (let conv of conversations) {
+                        if (!conv.messages) conv.messages = [];
+                        for (let msg of conv.messages) {
+                            if (!msg.history) msg.history = [];
+                        }
+                        if (!conv.title) conv.title = "新对话";
+                    }
+                } catch(e) { conversations = []; }
+            }
+            if (!conversations.length) {
+                conversations = [{
+                    id: Date.now(),
+                    title: "新对话",
+                    messages: []
+                }];
+            }
+            const savedActive = localStorage.getItem("ds_activeConvId");
+            if (savedActive && conversations.some(c => c.id == savedActive)) activeConvId = parseInt(savedActive);
+            else activeConvId = conversations[0].id;
+            // 如果没有欢迎消息，添加一条
+            const conv = getCurrentConv();
+            if (conv && conv.messages.length === 0) {
+                conv.messages = [{ role: "assistant", content: "✨ 新版已加载：点击消息旁的📜可查看并切换该消息的历史版本。编辑消息时自动填入原内容。", history: [] }];
+                saveAll();
+            }
+            renderMessages();
+            updateTitle();
+        }
+
+        // 对话管理
+        function switchConversation(id) {
+            if (isLoading) { alert("请等待完成"); return; }
+            activeConvId = id;
+            saveAll();
+            updateTitle();
+            renderMessages();
+        }
+        function newConversation() {
+            if (isLoading) return;
+            const newId = Date.now();
+            conversations.push({ id: newId, title: "新对话", messages: [] });
+            activeConvId = newId;
+            saveAll();
+            updateTitle();
+            renderMessages();
+            closeModalPanel();
+        }
+        function deleteConversation(id) {
+            if (conversations.length === 1) { alert("至少保留一个对话"); return; }
+            const idx = conversations.findIndex(c => c.id === id);
+            if (idx !== -1) {
+                conversations.splice(idx, 1);
+                if (activeConvId === id) activeConvId = conversations[0].id;
+                saveAll();
+                updateTitle();
+                renderMessages();
+                closeModalPanel();
+            }
+        }
+        function refreshConvList() {
+            convListUl.innerHTML = "";
+            conversations.forEach(c => {
+                const li = document.createElement("li");
+                const span = document.createElement("span");
+                span.className = "conv-title";
+                span.innerText = c.title || "对话";
+                span.onclick = () => { switchConversation(c.id); closeModalPanel(); };
+                const del = document.createElement("button");
+                del.className = "del-conv";
+                del.innerText = "🗑️";
+                del.onclick = (e) => { e.stopPropagation(); if(confirm("删除对话？")) deleteConversation(c.id); };
+                li.appendChild(span);
+                li.appendChild(del);
+                convListUl.appendChild(li);
             });
         }
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    }
+        function openModalPanel() { refreshConvList(); convModal.style.display = "flex"; }
+        function closeModalPanel() { convModal.style.display = "none"; }
+        function closeHistoryModalPanel() { msgHistoryModal.style.display = "none"; }
 
-    function showLoading() {
-        const ld = document.createElement("div");
-        ld.className = "message assistant-message";
-        ld.id = "loadingMsg";
-        ld.innerHTML = `<div class="loading-bubble"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>`;
-        messagesContainer.appendChild(ld);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    }
-    function hideLoading() { document.getElementById("loadingMsg")?.remove(); }
-
-    function updateCurrentTitle() {
-        const conv = getCurrentConv();
-        if (conv) {
-            const idx = conv.currentVersionIndex;
-            const total = conv.versionStack.length;
-            currentConvNameSpan.innerText = `${conv.title || "未命名"} (${idx+1}/${total})`;
-        } else { currentConvNameSpan.innerText = "对话"; }
-    }
-
-    // ==================== 对话管理 ====================
-    function switchConversation(convId) {
-        if (isLoading) { alert("请等待当前回复完成"); return; }
-        activeConvId = convId;
-        saveAllData();
-        updateCurrentTitle();
-        renderMessages();
-    }
-    function createNewConversation() {
-        if (isLoading) { alert("请等待当前回复完成"); return; }
-        const newId = Date.now();
-        conversations.push({
-            id: newId,
-            title: "新对话",
-            versionStack: [[SYSTEM_MESSAGE]],
-            currentVersionIndex: 0
-        });
-        activeConvId = newId;
-        saveAllData();
-        updateCurrentTitle();
-        renderMessages();
-        closeModal();
-    }
-    function deleteConversation(convId) {
-        if (conversations.length === 1) { alert("至少保留一个对话"); return; }
-        const idx = conversations.findIndex(c => c.id === convId);
-        if (idx !== -1) {
-            conversations.splice(idx, 1);
-            if (activeConvId === convId) activeConvId = conversations[0].id;
-            saveAllData();
-            updateCurrentTitle();
-            renderMessages();
-            closeModal();
+        // 备份导出
+        function exportBackup() {
+            const dataStr = JSON.stringify(conversations);
+            const blob = new Blob([dataStr], {type: "application/json"});
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = `deepseek_backup_${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+            alert("备份已导出");
         }
-    }
-    function refreshConvModal() {
-        convListUl.innerHTML = "";
-        conversations.forEach(conv => {
-            const li = document.createElement("li");
-            const titleSpan = document.createElement("span");
-            titleSpan.className = "conv-title";
-            titleSpan.innerText = conv.title || "未命名";
-            titleSpan.onclick = () => { switchConversation(conv.id); closeModal(); };
-            const delBtn = document.createElement("button");
-            delBtn.className = "del-conv";
-            delBtn.innerText = "🗑️";
-            delBtn.onclick = (e) => { e.stopPropagation(); if (confirm(`删除对话“${conv.title}”？`)) deleteConversation(conv.id); };
-            li.appendChild(titleSpan);
-            li.appendChild(delBtn);
-            convListUl.appendChild(li);
-        });
-    }
-    function openModal() { refreshConvModal(); convModal.style.display = "flex"; }
-    function closeModal() { convModal.style.display = "none"; }
-
-    function undoVersion() {
-        const conv = getCurrentConv();
-        if (conv && conv.currentVersionIndex > 0) {
-            conv.currentVersionIndex--;
-            saveAllData();
-            renderMessages();
-            updateCurrentTitle();
-        } else { alert("已是最早版本"); }
-    }
-    function redoVersion() {
-        const conv = getCurrentConv();
-        if (conv && conv.currentVersionIndex < conv.versionStack.length - 1) {
-            conv.currentVersionIndex++;
-            saveAllData();
-            renderMessages();
-            updateCurrentTitle();
-        } else { alert("已是最新版本"); }
-    }
-    function showVersionList() {
-        const conv = getCurrentConv();
-        if (!conv) return;
-        versionListUl.innerHTML = "";
-        conv.versionStack.forEach((_, idx) => {
-            const li = document.createElement("li");
-            const versionSpan = document.createElement("span");
-            versionSpan.className = "version-title";
-            versionSpan.innerText = `版本 ${idx+1}${idx === conv.currentVersionIndex ? " (当前)" : ""}`;
-            versionSpan.onclick = () => {
-                restoreVersion(conv, idx);
-                closeVersionModal();
-                updateCurrentTitle();
-            };
-            li.appendChild(versionSpan);
-            versionListUl.appendChild(li);
-        });
-        versionModal.style.display = "flex";
-    }
-    function closeVersionModal() { versionModal.style.display = "none"; }
-
-    // 备份导出
-    function exportBackup() {
-        const dataStr = JSON.stringify(conversations, null, 2);
-        const blob = new Blob([dataStr], {type: "application/json"});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `deepseek_backup_${new Date().toISOString().slice(0,19)}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-        alert("已导出备份文件，请妥善保存。");
-    }
-    function importBackup() {
-        const input = document.createElement("input");
-        input.type = "file";
-        input.accept = "application/json";
-        input.onchange = (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                try {
-                    const imported = JSON.parse(ev.target.result);
-                    if (Array.isArray(imported) && imported.length > 0 && imported[0].id && imported[0].versionStack) {
-                        // 合并导入的对话（追加，不覆盖现有）
-                        for (let imp of imported) {
-                            if (!conversations.some(c => c.id === imp.id)) {
-                                conversations.push(imp);
-                            } else {
-                                if (confirm(`对话“${imp.title}”已存在，是否覆盖？`)) {
+        function importBackup() {
+            const input = document.createElement("input");
+            input.type = "file";
+            input.accept = "application/json";
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    try {
+                        const imported = JSON.parse(ev.target.result);
+                        if (Array.isArray(imported) && imported.length) {
+                            for (let imp of imported) {
+                                if (!conversations.some(c => c.id === imp.id)) conversations.push(imp);
+                                else if (confirm(`覆盖对话“${imp.title}”?`)) {
                                     const idx = conversations.findIndex(c => c.id === imp.id);
                                     conversations[idx] = imp;
                                 }
                             }
-                        }
-                        saveAllData();
-                        if (!activeConvId || !conversations.some(c => c.id === activeConvId)) {
-                            activeConvId = conversations[0].id;
-                        }
-                        updateCurrentTitle();
-                        renderMessages();
-                        alert("导入成功！");
-                    } else {
-                        alert("备份文件格式不正确");
-                    }
-                } catch (err) { alert("解析失败"); }
+                            saveAll();
+                            if (!activeConvId || !conversations.some(c => c.id === activeConvId)) activeConvId = conversations[0].id;
+                            renderMessages();
+                            updateTitle();
+                            alert("导入成功");
+                        } else alert("格式错误");
+                    } catch(err) { alert("解析失败"); }
+                };
+                reader.readAsText(file);
             };
-            reader.readAsText(file);
-        };
-        input.click();
-    }
-
-    // ==================== 初始化 ====================
-    function loadApiKey() {
-        const saved = localStorage.getItem("deepseek_api_key");
-        if (saved) { apiKeyInput.value = saved; currentApiKey = saved; }
-    }
-    function saveApiKey() {
-        const newKey = apiKeyInput.value.trim();
-        if (newKey === "") {
-            if (confirm("清除 API Key？")) { localStorage.removeItem("deepseek_api_key"); currentApiKey = ""; alert("已清除"); }
-        } else {
-            localStorage.setItem("deepseek_api_key", newKey);
-            currentApiKey = newKey;
-            alert("✅ API Key 已保存");
+            input.click();
         }
-    }
-    function initDeepThinkToggle() {
-        const savedMode = localStorage.getItem("deepthink_mode");
-        if (savedMode === "true") { deepThinkToggle.checked = true; currentModel = "deepseek-reasoner"; }
-        else { deepThinkToggle.checked = false; currentModel = "deepseek-chat"; }
-        deepThinkToggle.addEventListener("change", (e) => {
-            if (e.target.checked) { currentModel = "deepseek-reasoner"; localStorage.setItem("deepthink_mode", "true"); }
-            else { currentModel = "deepseek-chat"; localStorage.setItem("deepthink_mode", "false"); }
-            const tip = document.createElement("div");
-            tip.style.position = "fixed"; tip.style.bottom = "70px"; tip.style.left = "20px";
-            tip.style.background = "#1f7e8c"; tip.style.color = "white"; tip.style.padding = "6px 12px";
-            tip.style.borderRadius = "20px"; tip.style.fontSize = "0.7rem"; tip.style.zIndex = "999";
-            tip.innerText = `已切换至 ${currentModel === "deepseek-reasoner" ? "深度思考(R1)" : "普通模式(V3)"}`;
-            document.body.appendChild(tip);
-            setTimeout(() => tip.remove(), 1500);
-        });
-    }
-    function autoResizeTextarea() {
-        userInputEl.style.height = 'auto';
-        userInputEl.style.height = Math.min(100, userInputEl.scrollHeight) + 'px';
-    }
-    function bindEvents() {
-        sendButton.addEventListener("click", () => {
-            const text = userInputEl.value.trim();
-            if (text && !isLoading) {
-                userInputEl.value = "";
-                userInputEl.style.height = "auto";
-                sendMessageWithHistory(text);
+
+        // 初始化
+        function loadApiKey() {
+            const saved = localStorage.getItem("deepseek_api_key");
+            if (saved) { apiInput.value = saved; currentApiKey = saved; }
+        }
+        function saveApiKey() {
+            const newKey = apiInput.value.trim();
+            if (newKey === "") {
+                if (confirm("清除 API Key？")) { localStorage.removeItem("deepseek_api_key"); currentApiKey = ""; alert("已清除"); }
+            } else {
+                localStorage.setItem("deepseek_api_key", newKey);
+                currentApiKey = newKey;
+                alert("✅ API Key 已保存");
             }
-        });
-        saveApiBtn.addEventListener("click", saveApiKey);
-        newConvBtn.addEventListener("click", createNewConversation);
-        showConvListBtn.addEventListener("click", openModal);
-        closeModalBtn.addEventListener("click", closeModal);
-        modalNewConvBtn.addEventListener("click", () => { createNewConversation(); closeModal(); });
-        undoVersionBtn.addEventListener("click", undoVersion);
-        redoVersionBtn.addEventListener("click", redoVersion);
-        showVersionListBtn.addEventListener("click", showVersionList);
-        closeVersionModalBtn.addEventListener("click", closeVersionModal);
-        exportBackupBtn.addEventListener("click", exportBackup);
-        importBackupBtn.addEventListener("click", importBackup);
-        userInputEl.addEventListener("keydown", (e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                const text = userInputEl.value.trim();
+        }
+        function initDeepThinkToggle() {
+            const savedMode = localStorage.getItem("deepthink_mode");
+            if (savedMode === "true") { toggleDeep.checked = true; currentModel = "deepseek-reasoner"; }
+            else { toggleDeep.checked = false; currentModel = "deepseek-chat"; }
+            toggleDeep.addEventListener("change", (e) => {
+                if (e.target.checked) { currentModel = "deepseek-reasoner"; localStorage.setItem("deepthink_mode", "true"); }
+                else { currentModel = "deepseek-chat"; localStorage.setItem("deepthink_mode", "false"); }
+                const tip = document.createElement("div");
+                tip.style.position = "fixed"; tip.style.bottom = "70px"; tip.style.left = "20px";
+                tip.style.background = "#1f7e8c"; tip.style.color = "white"; tip.style.padding = "6px 12px";
+                tip.style.borderRadius = "20px"; tip.style.fontSize = "0.7rem"; tip.style.zIndex = "999";
+                tip.innerText = `已切换至 ${currentModel === "deepseek-reasoner" ? "深度思考(R1)" : "普通模式(V3)"}`;
+                document.body.appendChild(tip);
+                setTimeout(() => tip.remove(), 1500);
+            });
+        }
+        function autoResizeTextarea() {
+            userInput.style.height = 'auto';
+            userInput.style.height = Math.min(100, userInput.scrollHeight) + 'px';
+        }
+        function bindEvents() {
+            sendBtn.addEventListener("click", () => {
+                const text = userInput.value.trim();
                 if (text && !isLoading) {
-                    userInputEl.value = "";
-                    userInputEl.style.height = "auto";
-                    sendMessageWithHistory(text);
+                    userInput.value = "";
+                    userInput.style.height = "auto";
+                    sendMessage(text);
                 }
-            }
-        });
-        userInputEl.addEventListener("input", autoResizeTextarea);
-        window.addEventListener("click", (e) => { if (e.target === convModal) closeModal(); if (e.target === versionModal) closeVersionModal(); });
-    }
-    function bootstrap() {
-        loadApiKey();
-        loadAllData();
-        initDeepThinkToggle();
-        bindEvents();
-        renderMessages();
-        updateCurrentTitle();
-    }
-    bootstrap();
+            });
+            saveApi.addEventListener("click", saveApiKey);
+            newConv.addEventListener("click", newConversation);
+            showConvList.addEventListener("click", openModalPanel);
+            closeModalBtn.addEventListener("click", closeModalPanel);
+            modalNewConv.addEventListener("click", () => { newConversation(); closeModalPanel(); });
+            exportBtn.addEventListener("click", exportBackup);
+            importBtn.addEventListener("click", importBackup);
+            closeHistoryModal.addEventListener("click", closeHistoryModalPanel);
+            userInput.addEventListener("keydown", (e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    const text = userInput.value.trim();
+                    if (text && !isLoading) {
+                        userInput.value = "";
+                        userInput.style.height = "auto";
+                        sendMessage(text);
+                    }
+                }
+            });
+            userInput.addEventListener("input", autoResizeTextarea);
+            window.addEventListener("click", (e) => { if (e.target === convModal) closeModalPanel(); if (e.target === msgHistoryModal) closeHistoryModalPanel(); });
+        }
+
+        function bootstrap() {
+            loadApiKey();
+            loadData();
+            initDeepThinkToggle();
+            bindEvents();
+        }
+        bootstrap();
+    })();
 </script>
 </body>
 </html>
