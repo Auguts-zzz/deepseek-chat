@@ -116,7 +116,7 @@
     const closeHistoryModalBtn = document.getElementById("closeHistoryModalBtn");
     const historyListUl = document.getElementById("historyListUl");
 
-    // ------------------- 核心存储（保证刷新不丢）-------------------
+    // ------------------- 核心存储（兼容旧数据）-------------------
     function saveAll() {
         try {
             localStorage.setItem("ds_conversations", JSON.stringify(conversations));
@@ -124,28 +124,30 @@
         } catch(e) { console.warn("保存失败", e); }
     }
 
-    // 健壮的数据加载：优先从 ds_conversations 读取，若无则尝试迁移旧版 ds_messages，再不行就创建默认
+    // 修复旧数据格式：确保每条消息都有 history 字段
+    function ensureHistoryField(conv) {
+        if (!conv.messages) conv.messages = [];
+        for (let msg of conv.messages) {
+            if (!msg.history) msg.history = [];
+        }
+        if (!conv.title) conv.title = "对话";
+        return conv;
+    }
+
     function loadAllData() {
         let loaded = false;
+        // 1. 尝试从新版 ds_conversations 读取
         const saved = localStorage.getItem("ds_conversations");
         if (saved) {
             try {
                 let parsed = JSON.parse(saved);
                 if (Array.isArray(parsed) && parsed.length > 0) {
-                    conversations = parsed;
-                    // 确保每条消息都有 history 字段
-                    for (let conv of conversations) {
-                        if (!conv.messages) conv.messages = [];
-                        for (let msg of conv.messages) {
-                            if (!msg.history) msg.history = [];
-                        }
-                        if (!conv.title) conv.title = "对话";
-                    }
+                    conversations = parsed.map(conv => ensureHistoryField(conv));
                     loaded = true;
                 }
             } catch(e) { console.warn("解析 ds_conversations 失败", e); }
         }
-        // 如果没加载到，尝试从旧版 ds_messages 恢复
+        // 2. 如果没读到，尝试从旧版 ds_messages 迁移（单个对话）
         if (!loaded) {
             const oldMessages = localStorage.getItem("ds_messages");
             if (oldMessages) {
@@ -158,12 +160,12 @@
                         messages: msgs.map(m => ({ ...m, history: [] })),
                     };
                     conversations = [newConv];
-                    localStorage.removeItem("ds_messages"); // 清理旧键
+                    localStorage.removeItem("ds_messages");
                     loaded = true;
                 } catch(e) {}
             }
         }
-        // 仍然没有，创建默认对话
+        // 3. 如果还不行，创建默认对话
         if (!loaded || conversations.length === 0) {
             conversations = [{
                 id: Date.now(),
@@ -178,7 +180,7 @@
         } else {
             activeConvId = conversations[0].id;
         }
-        // 额外检查：如果当前对话的 messages 为空，加一条欢迎语
+        // 额外保险：如果当前对话 messages 为空，添加默认消息
         const currConv = conversations.find(c => c.id === activeConvId);
         if (currConv && (!currConv.messages || currConv.messages.length === 0)) {
             currConv.messages = [{ role: "assistant", content: "✨ 欢迎！现在每条消息都支持独立历史版本，编辑时会自动填入原内容。刷新页面不会丢失记录。", history: [] }];
@@ -201,7 +203,7 @@
         const conv = getCurrentConv();
         if (conv) {
             conv.messages = messages;
-            // 自动生成标题（取第一条用户消息前20字）
+            // 自动生成标题
             const firstUser = messages.find(m => m.role === "user");
             if (firstUser && (conv.title === "新对话" || !conv.title)) {
                 let newTitle = firstUser.content.slice(0, 20);
@@ -242,7 +244,7 @@
                 setTimeout(() => copyBtn.innerHTML = "📋 复制", 1000);
             };
             actions.appendChild(copyBtn);
-            // 历史版本
+            // 历史
             const historyBtn = document.createElement("button");
             historyBtn.className = "action-btn";
             historyBtn.innerHTML = "📜 历史";
@@ -363,7 +365,7 @@
         }
     }
 
-    // 编辑用户消息（预填原内容）
+    // 编辑用户消息
     async function editUserMessage(idx, oldContent) {
         if (isLoading) return;
         const newContent = prompt("编辑消息内容:", oldContent);
@@ -604,28 +606,4 @@
         importBackupBtn.addEventListener("click", importBackup);
         closeHistoryModalBtn.addEventListener("click", closeHistoryModalPanel);
         userInput.addEventListener("keydown", (e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                const text = userInput.value.trim();
-                if (text && !isLoading) {
-                    userInput.value = "";
-                    userInput.style.height = "auto";
-                    sendMessage(text);
-                }
-            }
-        });
-        userInput.addEventListener("input", autoResizeTextarea);
-        window.addEventListener("click", (e) => { if (e.target === convModal) closeModalPanel(); if (e.target === msgHistoryModal) closeHistoryModalPanel(); });
-    }
-
-    function bootstrap() {
-        loadApiKey();
-        loadAllData();      // 核心：可靠加载数据
-        initDeepThinkToggle();
-        bindEvents();
-    }
-    bootstrap();
-})();
-</script>
-</body>
-</html>
+    
