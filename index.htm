@@ -625,4 +625,14 @@
         // 额外保险：确保 key 输入框不被意外清空
         setTimeout(() => {
             const saved = localStorage.getItem("deepseek_api_key");
-            if (saved && apiIn
+            if (saved && apiInput.value !== saved) {
+                apiInput.value = saved;
+                currentApiKey = saved;
+            }
+        }, 100);
+    }
+    bootstrap();
+})();
+</script>
+</body>
+</html>
