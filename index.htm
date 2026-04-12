@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>DeepSeek 消息级历史版本 · 完美编辑</title>
+    <title>DeepSeek · 稳定持久化 | 消息历史版本</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { background: #e9eef4; font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 0; }
@@ -78,7 +78,7 @@
         </div>
         <button id="sendButton" class="send-btn">➤</button>
     </div>
-    <div class="footer-note">🔒 API Key 仅存本地 | 每条消息独立历史版本</div>
+    <div class="footer-note">🔒 API Key 仅存本地 | 每条消息独立历史版本 | 刷新不丢数据</div>
 </div>
 
 <div id="convModal" class="modal"><div class="modal-content"><div class="modal-header"><span>📁 我的对话</span><button id="closeModalBtn" class="icon-btn">✖️</button></div><ul id="convListUl"></ul><button id="modalNewConvBtn" class="new-conv-btn">➕ 新建对话</button></div></div>
@@ -86,7 +86,7 @@
 
 <script>
 (function(){
-    // ==================== 配置 ====================
+    // ------------------- 配置 -------------------
     const DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions";
     const SYSTEM_MESSAGE = { role: "system", content: "你是DeepSeek助手，扮演角色进行对话，保持一致性，使用中文。" };
     
@@ -116,10 +116,76 @@
     const closeHistoryModalBtn = document.getElementById("closeHistoryModalBtn");
     const historyListUl = document.getElementById("historyListUl");
 
-    // ==================== 辅助函数 ====================
+    // ------------------- 核心存储（保证刷新不丢）-------------------
     function saveAll() {
-        localStorage.setItem("ds_conversations", JSON.stringify(conversations));
-        localStorage.setItem("ds_activeConvId", activeConvId);
+        try {
+            localStorage.setItem("ds_conversations", JSON.stringify(conversations));
+            localStorage.setItem("ds_activeConvId", activeConvId);
+        } catch(e) { console.warn("保存失败", e); }
+    }
+
+    // 健壮的数据加载：优先从 ds_conversations 读取，若无则尝试迁移旧版 ds_messages，再不行就创建默认
+    function loadAllData() {
+        let loaded = false;
+        const saved = localStorage.getItem("ds_conversations");
+        if (saved) {
+            try {
+                let parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    conversations = parsed;
+                    // 确保每条消息都有 history 字段
+                    for (let conv of conversations) {
+                        if (!conv.messages) conv.messages = [];
+                        for (let msg of conv.messages) {
+                            if (!msg.history) msg.history = [];
+                        }
+                        if (!conv.title) conv.title = "对话";
+                    }
+                    loaded = true;
+                }
+            } catch(e) { console.warn("解析 ds_conversations 失败", e); }
+        }
+        // 如果没加载到，尝试从旧版 ds_messages 恢复
+        if (!loaded) {
+            const oldMessages = localStorage.getItem("ds_messages");
+            if (oldMessages) {
+                try {
+                    let msgs = JSON.parse(oldMessages);
+                    if (!msgs.some(m => m.role === "system")) msgs.unshift(SYSTEM_MESSAGE);
+                    const newConv = {
+                        id: Date.now(),
+                        title: "恢复的对话",
+                        messages: msgs.map(m => ({ ...m, history: [] })),
+                    };
+                    conversations = [newConv];
+                    localStorage.removeItem("ds_messages"); // 清理旧键
+                    loaded = true;
+                } catch(e) {}
+            }
+        }
+        // 仍然没有，创建默认对话
+        if (!loaded || conversations.length === 0) {
+            conversations = [{
+                id: Date.now(),
+                title: "新对话",
+                messages: [{ role: "assistant", content: "✨ 欢迎！现在每条消息都支持独立历史版本，编辑时会自动填入原内容。刷新页面不会丢失记录。", history: [] }]
+            }];
+        }
+        // 恢复当前激活的对话ID
+        const savedActive = localStorage.getItem("ds_activeConvId");
+        if (savedActive && conversations.some(c => c.id == savedActive)) {
+            activeConvId = parseInt(savedActive);
+        } else {
+            activeConvId = conversations[0].id;
+        }
+        // 额外检查：如果当前对话的 messages 为空，加一条欢迎语
+        const currConv = conversations.find(c => c.id === activeConvId);
+        if (currConv && (!currConv.messages || currConv.messages.length === 0)) {
+            currConv.messages = [{ role: "assistant", content: "✨ 欢迎！现在每条消息都支持独立历史版本，编辑时会自动填入原内容。刷新页面不会丢失记录。", history: [] }];
+            saveAll();
+        }
+        renderMessages();
+        updateTitle();
     }
 
     function getCurrentConv() {
@@ -128,15 +194,14 @@
 
     function getCurrentMessages() {
         const conv = getCurrentConv();
-        if (!conv) return [];
-        return conv.messages || [];
+        return conv ? (conv.messages || []) : [];
     }
 
     function saveCurrentMessages(messages) {
         const conv = getCurrentConv();
         if (conv) {
             conv.messages = messages;
-            // 自动生成标题
+            // 自动生成标题（取第一条用户消息前20字）
             const firstUser = messages.find(m => m.role === "user");
             if (firstUser && (conv.title === "新对话" || !conv.title)) {
                 let newTitle = firstUser.content.slice(0, 20);
@@ -147,19 +212,6 @@
             renderMessages();
             updateTitle();
         }
-    }
-
-    function addMessageHistory(msgIndex, newContent) {
-        const messages = getCurrentMessages();
-        if (msgIndex >= messages.length) return;
-        const msg = messages[msgIndex];
-        if (!msg.history) msg.history = [];
-        if (msg.history[msg.history.length-1] !== msg.content) {
-            msg.history.push(msg.content);
-            if (msg.history.length > 20) msg.history.shift();
-        }
-        msg.content = newContent;
-        saveCurrentMessages(messages);
     }
 
     function renderMessages() {
@@ -179,7 +231,7 @@
             div.appendChild(bubble);
             const actions = document.createElement("div");
             actions.className = "message-actions";
-            // 复制按钮
+            // 复制
             const copyBtn = document.createElement("button");
             copyBtn.className = "action-btn";
             copyBtn.innerHTML = "📋 复制";
@@ -190,7 +242,7 @@
                 setTimeout(() => copyBtn.innerHTML = "📋 复制", 1000);
             };
             actions.appendChild(copyBtn);
-            // 历史版本按钮
+            // 历史版本
             const historyBtn = document.createElement("button");
             historyBtn.className = "action-btn";
             historyBtn.innerHTML = "📜 历史";
@@ -199,7 +251,7 @@
                 showMessageHistory(idx, msg.content, msg.history || []);
             };
             actions.appendChild(historyBtn);
-            // 编辑按钮（仅用户消息）
+            // 编辑（仅用户）
             if (isUser) {
                 const editBtn = document.createElement("button");
                 editBtn.className = "action-btn";
@@ -210,7 +262,7 @@
                 };
                 actions.appendChild(editBtn);
             }
-            // 重新生成按钮（仅最后一条AI消息）
+            // 重新生成（仅最后一条AI）
             if (!isUser) {
                 const lastAssistantIdx = messages.reduce((last, m, i) => m.role === "assistant" ? i : last, -1);
                 if (idx === lastAssistantIdx) {
@@ -278,6 +330,7 @@
         }
     }
 
+    // 发送新消息
     async function sendMessage(text) {
         if (isLoading) { alert("请等待上一条回复完成"); return; }
         const conv = getCurrentConv();
@@ -310,6 +363,7 @@
         }
     }
 
+    // 编辑用户消息（预填原内容）
     async function editUserMessage(idx, oldContent) {
         if (isLoading) return;
         const newContent = prompt("编辑消息内容:", oldContent);
@@ -404,36 +458,7 @@
         msgHistoryModal.style.display = "flex";
     }
 
-    // ==================== 数据加载与迁移 ====================
-    function loadData() {
-        const saved = localStorage.getItem("ds_conversations");
-        if (saved) {
-            try {
-                conversations = JSON.parse(saved);
-                for (let conv of conversations) {
-                    if (!conv.messages) conv.messages = [];
-                    for (let msg of conv.messages) {
-                        if (!msg.history) msg.history = [];
-                    }
-                    if (!conv.title) conv.title = "新对话";
-                }
-            } catch(e) { conversations = []; }
-        }
-        if (!conversations.length) {
-            conversations = [{
-                id: Date.now(),
-                title: "新对话",
-                messages: [{ role: "assistant", content: "✨ 新版已加载：点击消息旁的📜可查看并切换该消息的历史版本。编辑消息时自动填入原内容。", history: [] }]
-            }];
-        }
-        const savedActive = localStorage.getItem("ds_activeConvId");
-        if (savedActive && conversations.some(c => c.id == savedActive)) activeConvId = parseInt(savedActive);
-        else activeConvId = conversations[0].id;
-        renderMessages();
-        updateTitle();
-    }
-
-    // ==================== 对话管理 ====================
+    // 对话管理
     function switchConversation(id) {
         if (isLoading) { alert("请等待完成"); return; }
         activeConvId = id;
@@ -526,7 +551,7 @@
         input.click();
     }
 
-    // ==================== 初始化 ====================
+    // 初始化
     function loadApiKey() {
         const saved = localStorage.getItem("deepseek_api_key");
         if (saved) { apiInput.value = saved; currentApiKey = saved; }
@@ -595,7 +620,7 @@
 
     function bootstrap() {
         loadApiKey();
-        loadData();
+        loadAllData();      // 核心：可靠加载数据
         initDeepThinkToggle();
         bindEvents();
     }
