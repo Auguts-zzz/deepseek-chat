@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>DeepSeek · 稳定持久化 | 消息历史版本</title>
+    <title>DeepSeek · 稳定版 | 消息历史版本</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { background: #e9eef4; font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 0; }
@@ -116,16 +116,16 @@
     const closeHistoryModalBtn = document.getElementById("closeHistoryModalBtn");
     const historyListUl = document.getElementById("historyListUl");
 
-    // ------------------- 核心存储（兼容旧数据）-------------------
+    // ------------------- 存储 -------------------
     function saveAll() {
         try {
             localStorage.setItem("ds_conversations", JSON.stringify(conversations));
             localStorage.setItem("ds_activeConvId", activeConvId);
-        } catch(e) { console.warn("保存失败", e); }
+        } catch(e) { console.warn(e); }
     }
 
-    // 修复旧数据格式：确保每条消息都有 history 字段
-    function ensureHistoryField(conv) {
+    // 确保每条消息都有 history 字段
+    function normalizeConversation(conv) {
         if (!conv.messages) conv.messages = [];
         for (let msg of conv.messages) {
             if (!msg.history) msg.history = [];
@@ -136,54 +136,50 @@
 
     function loadAllData() {
         let loaded = false;
-        // 1. 尝试从新版 ds_conversations 读取
         const saved = localStorage.getItem("ds_conversations");
         if (saved) {
             try {
                 let parsed = JSON.parse(saved);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    conversations = parsed.map(conv => ensureHistoryField(conv));
+                if (Array.isArray(parsed) && parsed.length) {
+                    conversations = parsed.map(c => normalizeConversation(c));
                     loaded = true;
                 }
-            } catch(e) { console.warn("解析 ds_conversations 失败", e); }
+            } catch(e) { console.warn(e); }
         }
-        // 2. 如果没读到，尝试从旧版 ds_messages 迁移（单个对话）
         if (!loaded) {
-            const oldMessages = localStorage.getItem("ds_messages");
-            if (oldMessages) {
+            // 尝试迁移旧版 ds_messages
+            const old = localStorage.getItem("ds_messages");
+            if (old) {
                 try {
-                    let msgs = JSON.parse(oldMessages);
+                    let msgs = JSON.parse(old);
                     if (!msgs.some(m => m.role === "system")) msgs.unshift(SYSTEM_MESSAGE);
-                    const newConv = {
+                    conversations = [{
                         id: Date.now(),
                         title: "恢复的对话",
-                        messages: msgs.map(m => ({ ...m, history: [] })),
-                    };
-                    conversations = [newConv];
+                        messages: msgs.map(m => ({ ...m, history: [] }))
+                    }];
                     localStorage.removeItem("ds_messages");
                     loaded = true;
                 } catch(e) {}
             }
         }
-        // 3. 如果还不行，创建默认对话
         if (!loaded || conversations.length === 0) {
             conversations = [{
                 id: Date.now(),
                 title: "新对话",
-                messages: [{ role: "assistant", content: "✨ 欢迎！现在每条消息都支持独立历史版本，编辑时会自动填入原内容。刷新页面不会丢失记录。", history: [] }]
+                messages: [{ role: "assistant", content: "✨ 欢迎！每条消息都支持独立历史版本，编辑时自动填入原内容。刷新不丢数据。", history: [] }]
             }];
         }
-        // 恢复当前激活的对话ID
         const savedActive = localStorage.getItem("ds_activeConvId");
         if (savedActive && conversations.some(c => c.id == savedActive)) {
             activeConvId = parseInt(savedActive);
         } else {
             activeConvId = conversations[0].id;
         }
-        // 额外保险：如果当前对话 messages 为空，添加默认消息
-        const currConv = conversations.find(c => c.id === activeConvId);
-        if (currConv && (!currConv.messages || currConv.messages.length === 0)) {
-            currConv.messages = [{ role: "assistant", content: "✨ 欢迎！现在每条消息都支持独立历史版本，编辑时会自动填入原内容。刷新页面不会丢失记录。", history: [] }];
+        // 确保当前对话有消息
+        const curr = conversations.find(c => c.id === activeConvId);
+        if (curr && (!curr.messages || curr.messages.length === 0)) {
+            curr.messages = [{ role: "assistant", content: "✨ 欢迎！每条消息都支持独立历史版本，编辑时自动填入原内容。刷新不丢数据。", history: [] }];
             saveAll();
         }
         renderMessages();
@@ -196,14 +192,13 @@
 
     function getCurrentMessages() {
         const conv = getCurrentConv();
-        return conv ? (conv.messages || []) : [];
+        return conv ? conv.messages : [];
     }
 
     function saveCurrentMessages(messages) {
         const conv = getCurrentConv();
         if (conv) {
             conv.messages = messages;
-            // 自动生成标题
             const firstUser = messages.find(m => m.role === "user");
             if (firstUser && (conv.title === "新对话" || !conv.title)) {
                 let newTitle = firstUser.content.slice(0, 20);
@@ -606,4 +601,28 @@
         importBackupBtn.addEventListener("click", importBackup);
         closeHistoryModalBtn.addEventListener("click", closeHistoryModalPanel);
         userInput.addEventListener("keydown", (e) => {
-    
+            if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                const text = userInput.value.trim();
+                if (text && !isLoading) {
+                    userInput.value = "";
+                    userInput.style.height = "auto";
+                    sendMessage(text);
+                }
+            }
+        });
+        userInput.addEventListener("input", autoResizeTextarea);
+        window.addEventListener("click", (e) => { if (e.target === convModal) closeModalPanel(); if (e.target === msgHistoryModal) closeHistoryModalPanel(); });
+    }
+
+    function bootstrap() {
+        loadApiKey();
+        loadAllData();
+        initDeepThinkToggle();
+        bindEvents();
+    }
+    bootstrap();
+})();
+</script>
+</body>
+</html>
