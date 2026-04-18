@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>DeepSeek · 自动恢复旧数据版</title>
+    <title>DeepSeek · 最终完整版（可精简对话）</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { background: #e9eef4; font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 0; }
         .app { max-width: 100%; width: 100%; background: white; display: flex; flex-direction: column; height: 100vh; }
         .top-bar { background: #ffffffdd; backdrop-filter: blur(12px); padding: 12px 16px; border-bottom: 1px solid #eef2f0; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; justify-content: space-between; }
-        .conv-control { display: flex; align-items: center; gap: 8px; background: #f0f2f5; border-radius: 40px; padding: 4px 12px; }
+        .conv-control { display: flex; align-items: center; gap: 8px; background: #f0f2f5; border-radius: 40px; padding: 4px 12px; flex-wrap: wrap; }
         .conv-name { font-weight: 600; font-size: 0.9rem; color: #1f5e6e; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
         .icon-btn { background: transparent; border: none; font-size: 1.2rem; cursor: pointer; padding: 6px; border-radius: 30px; width: 32px; height: 32px; }
         .icon-btn:active { background: #e0e4ea; }
@@ -55,6 +55,7 @@
             <button id="showConvListBtn" class="icon-btn">📋</button>
             <span id="currentConvName" class="conv-name">对话</span>
             <button id="newConvBtn" class="icon-btn">➕</button>
+            <button id="trimCurrentBtn" class="small-btn" style="background:#ffe0e0;">✂️ 精简保留最近15轮</button>
             <button id="exportBackupBtn" class="small-btn">💾 备份</button>
             <button id="importBackupBtn" class="small-btn">📂 恢复</button>
         </div>
@@ -69,7 +70,7 @@
     </div>
     <div class="messages-container" id="messagesContainer">
         <div class="message assistant-message">
-            <div class="bubble">✨ 正在加载数据...</div>
+            <div class="bubble">✨ 加载中...</div>
         </div>
     </div>
     <div class="input-area">
@@ -78,7 +79,7 @@
         </div>
         <button id="sendButton" class="send-btn">➤</button>
     </div>
-    <div class="footer-note">🔒 API Key 仅存本地 | 每条消息独立历史版本 | 自动恢复旧数据</div>
+    <div class="footer-note">🔒 API Key 仅存本地 | 编辑时自动填入原内容 | 点击“精简保留最近15轮”可删除早期消息</div>
 </div>
 
 <div id="convModal" class="modal"><div class="modal-content"><div class="modal-header"><span>📁 我的对话</span><button id="closeModalBtn" class="icon-btn">✖️</button></div><ul id="convListUl"></ul><button id="modalNewConvBtn" class="new-conv-btn">➕ 新建对话</button></div></div>
@@ -106,6 +107,7 @@
     const convNameSpan = document.getElementById("currentConvName");
     const showConvListBtn = document.getElementById("showConvListBtn");
     const newConvBtn = document.getElementById("newConvBtn");
+    const trimCurrentBtn = document.getElementById("trimCurrentBtn");
     const exportBackupBtn = document.getElementById("exportBackupBtn");
     const importBackupBtn = document.getElementById("importBackupBtn");
     const convModal = document.getElementById("convModal");
@@ -116,7 +118,7 @@
     const closeHistoryModalBtn = document.getElementById("closeHistoryModalBtn");
     const historyListUl = document.getElementById("historyListUl");
 
-    // ---------- 核心存储 ----------
+    // ---------- 存储核心 ----------
     function saveAll() {
         try {
             localStorage.setItem("ds_conversations", JSON.stringify(conversations));
@@ -124,7 +126,6 @@
         } catch(e) { console.warn(e); }
     }
 
-    // 确保每条消息都有 history 字段
     function normalizeConversation(conv) {
         if (!conv.messages) conv.messages = [];
         for (let msg of conv.messages) {
@@ -134,84 +135,38 @@
         return conv;
     }
 
-    // 自动恢复所有可能的旧数据
-    function autoRecoverOldData() {
-        let recovered = false;
-        // 1. 尝试从 ds_conversations 读取
-        let saved = localStorage.getItem("ds_conversations");
+    function loadAllData() {
+        let loaded = false;
+        const saved = localStorage.getItem("ds_conversations");
         if (saved) {
             try {
                 let parsed = JSON.parse(saved);
                 if (Array.isArray(parsed) && parsed.length) {
                     conversations = parsed.map(c => normalizeConversation(c));
-                    recovered = true;
+                    loaded = true;
                 }
             } catch(e) {}
         }
-        // 2. 尝试从 ds_messages 恢复
-        if (!recovered) {
-            const old = localStorage.getItem("ds_messages");
-            if (old) {
-                try {
-                    let msgs = JSON.parse(old);
-                    if (!msgs.some(m => m.role === "system")) msgs.unshift(SYSTEM_MESSAGE);
-                    const newConv = {
-                        id: Date.now(),
-                        title: "恢复的对话",
-                        messages: msgs.map(m => ({ ...m, history: [] }))
-                    };
-                    conversations = [newConv];
-                    localStorage.removeItem("ds_messages");
-                    recovered = true;
-                } catch(e) {}
-            }
-        }
-        // 3. 尝试从旧版 conversations 或 messages（其他可能的键名）
-        if (!recovered) {
-            const otherKeys = ["conversations", "messages", "chat_history"];
-            for (let key of otherKeys) {
-                const val = localStorage.getItem(key);
-                if (val) {
-                    try {
-                        let parsed = JSON.parse(val);
-                        if (Array.isArray(parsed) && parsed.length) {
-                            // 假设它是消息数组
-                            if (parsed[0].role) {
-                                if (!parsed.some(m => m.role === "system")) parsed.unshift(SYSTEM_MESSAGE);
-                                conversations = [{
-                                    id: Date.now(),
-                                    title: "恢复的对话",
-                                    messages: parsed.map(m => ({ ...m, history: [] }))
-                                }];
-                                recovered = true;
-                                break;
-                            }
-                        }
-                    } catch(e) {}
-                }
-            }
-        }
-        // 4. 如果还是没数据，创建默认对话
-        if (!recovered || conversations.length === 0) {
+        if (!loaded) {
             conversations = [{
                 id: Date.now(),
                 title: "新对话",
-                messages: [{ role: "assistant", content: "✨ 欢迎！每条消息都支持独立历史版本，编辑时自动填入原内容。", history: [] }]
+                messages: [{ role: "assistant", content: "✨ 欢迎！编辑消息时会自动填入原内容。", history: [] }]
             }];
         }
-        // 恢复激活的对话ID
         const savedActive = localStorage.getItem("ds_activeConvId");
         if (savedActive && conversations.some(c => c.id == savedActive)) {
             activeConvId = parseInt(savedActive);
         } else {
             activeConvId = conversations[0].id;
         }
-        // 确保当前对话有消息
         const curr = conversations.find(c => c.id === activeConvId);
         if (curr && (!curr.messages || curr.messages.length === 0)) {
-            curr.messages = [{ role: "assistant", content: "✨ 欢迎！每条消息都支持独立历史版本，编辑时自动填入原内容。", history: [] }];
+            curr.messages = [{ role: "assistant", content: "✨ 欢迎！编辑消息时会自动填入原内容。", history: [] }];
         }
         saveAll();
+        renderMessages();
+        updateTitle();
     }
 
     function getCurrentConv() {
@@ -363,6 +318,7 @@
         }
     }
 
+    // 发送新消息
     async function sendMessage(text) {
         if (isLoading) { alert("请等待上一条回复完成"); return; }
         const conv = getCurrentConv();
@@ -395,8 +351,10 @@
         }
     }
 
+    // 编辑用户消息（确保预填原内容）
     async function editUserMessage(idx, oldContent) {
         if (isLoading) return;
+        // 关键：第二个参数 oldContent 会被自动填入输入框
         const newContent = prompt("编辑消息内容:", oldContent);
         if (newContent === null || newContent.trim() === "") return;
         const messages = getCurrentMessages();
@@ -478,6 +436,50 @@
         msgHistoryModal.style.display = "flex";
     }
 
+    // ---------- 精简当前对话（保留最近15轮）----------
+    function trimToLastRounds(rounds = 15) {
+        if (isLoading) { alert("请等待当前回复完成"); return; }
+        const conv = getCurrentConv();
+        if (!conv) return;
+        let messages = conv.messages;
+        if (messages.length === 0) { alert("没有消息可精简"); return; }
+        
+        // 分离系统消息（通常第一条是系统消息，也可能有多个，但一般只有一个）
+        const systemMsgs = messages.filter(m => m.role === "system");
+        const nonSystem = messages.filter(m => m.role !== "system");
+        
+        // 保留最近 rounds 轮，一轮 = user + assistant，即 2 条消息
+        let keepCount = rounds * 2;
+        let keptNonSystem = nonSystem.slice(-keepCount);
+        
+        if (keptNonSystem.length === nonSystem.length) {
+            alert("当前消息数不足15轮，无需精简");
+            return;
+        }
+        
+        const newMessages = [...systemMsgs, ...keptNonSystem];
+        // 确保每条消息的 history 字段保留（复制原有 history）
+        const finalMessages = newMessages.map(m => ({
+            role: m.role,
+            content: m.content,
+            history: m.history ? [...m.history] : []
+        }));
+        
+        // 直接替换当前对话的消息列表，并重置版本栈（避免历史版本引用旧消息）
+        conv.messages = finalMessages;
+        // 重置版本栈，只保留当前这一个版本
+        conv.versionStack = [JSON.parse(JSON.stringify(finalMessages))];
+        conv.currentVersionIndex = 0;
+        // 更新标题（可选）
+        if (conv.title && !conv.title.includes("(精简)")) {
+            conv.title = conv.title + " (精简)";
+        }
+        saveAll();
+        renderMessages();
+        updateTitle();
+        alert(`已精简对话，保留了最近 ${rounds} 轮消息（共 ${keptNonSystem.length} 条）。原早期消息已删除。`);
+    }
+
     // 对话管理
     function switchConversation(id) {
         if (isLoading) { alert("请等待完成"); return; }
@@ -489,7 +491,7 @@
     function newConversation() {
         if (isLoading) return;
         const newId = Date.now();
-        conversations.push({ id: newId, title: "新对话", messages: [] });
+        conversations.push({ id: newId, title: "新对话", messages: [], versionStack: [], currentVersionIndex: 0 });
         activeConvId = newId;
         saveAll();
         updateTitle();
@@ -551,13 +553,7 @@
                 try {
                     const imported = JSON.parse(ev.target.result);
                     if (Array.isArray(imported) && imported.length) {
-                        for (let imp of imported) {
-                            if (!conversations.some(c => c.id === imp.id)) conversations.push(imp);
-                            else if (confirm(`覆盖对话“${imp.title}”?`)) {
-                                const idx = conversations.findIndex(c => c.id === imp.id);
-                                conversations[idx] = imp;
-                            }
-                        }
+                        conversations = imported.map(c => normalizeConversation(c));
                         saveAll();
                         if (!activeConvId || !conversations.some(c => c.id === activeConvId)) activeConvId = conversations[0].id;
                         renderMessages();
@@ -631,6 +627,11 @@
         });
         saveApiBtn.addEventListener("click", saveApiKey);
         newConvBtn.addEventListener("click", newConversation);
+        trimCurrentBtn.addEventListener("click", () => {
+            if (confirm("精简操作会删除当前对话中超过最近15轮的消息，不可逆。建议先点击「💾 备份」。是否继续？")) {
+                trimToLastRounds(15);
+            }
+        });
         showConvListBtn.addEventListener("click", openModalPanel);
         closeModalBtn.addEventListener("click", closeModalPanel);
         modalNewConvBtn.addEventListener("click", () => { newConversation(); closeModalPanel(); });
@@ -654,10 +655,9 @@
 
     function bootstrap() {
         loadApiKey();
-        autoRecoverOldData();   // 自动恢复所有旧数据
+        loadAllData();
         initDeepThinkToggle();
         bindEvents();
-        // 二次确保 Key 不被清空
         setTimeout(() => {
             const saved = localStorage.getItem("deepseek_api_key");
             if (saved && apiInput.value !== saved) {
