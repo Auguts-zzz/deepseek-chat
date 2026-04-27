@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>DeepSeek 0427-03</title>
+    <title>DeepSeek · 0427-04</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { background: #e9eef4; font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 0; }
@@ -36,8 +36,53 @@
         textarea { width: 100%; border: none; background: transparent; resize: none; font-size: 0.9rem; font-family: inherit; outline: none; max-height: 100px; }
         .send-btn { background: #1f7e8c; border: none; width: 44px; height: 44px; border-radius: 44px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; font-size: 1.2rem; }
         .send-btn.disabled { opacity: 0.5; pointer-events: none; }
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: white; width: 85%; max-width: 320px; border-radius: 28px; padding: 20px; max-height: 70%; overflow-y: auto; }
+        /* 自定义编辑模态框 */
+        .edit-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        .edit-modal-content {
+            background: white;
+            width: 85%;
+            max-width: 400px;
+            border-radius: 28px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+        .edit-modal-content textarea {
+            width: 100%;
+            border: 1px solid #ccc;
+            border-radius: 16px;
+            padding: 12px;
+            font-size: 0.9rem;
+            font-family: inherit;
+            margin: 12px 0;
+            resize: vertical;
+        }
+        .edit-modal-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+        .edit-modal-buttons button {
+            padding: 8px 16px;
+            border-radius: 40px;
+            border: none;
+            background: #eef2f7;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+        .edit-modal-buttons button:first-child { background: #1f7e8c; color: white; }
+        .modal, .version-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content, .version-modal-content { background: white; width: 85%; max-width: 320px; border-radius: 28px; padding: 20px; max-height: 70%; overflow-y: auto; }
         .modal-header { font-weight: 600; margin-bottom: 12px; display: flex; justify-content: space-between; }
         .conv-list, .version-list { list-style: none; }
         .conv-list li, .version-list li { padding: 12px 8px; border-bottom: 1px solid #eef2f0; display: flex; justify-content: space-between; align-items: center; }
@@ -79,7 +124,19 @@
         </div>
         <button id="sendButton" class="send-btn">➤</button>
     </div>
-    <div class="footer-note">🔒 编辑消息会自动预填原内容（终极修复）</div>
+    <div class="footer-note">🔒 编辑消息会自动预填原内容（自定义对话框，手机完美支持）</div>
+</div>
+
+<!-- 自定义编辑模态框 -->
+<div id="editModal" class="edit-modal">
+    <div class="edit-modal-content">
+        <div style="font-weight:600; margin-bottom:8px;">编辑消息</div>
+        <textarea id="editTextarea" rows="4"></textarea>
+        <div class="edit-modal-buttons">
+            <button id="editConfirmBtn">确定</button>
+            <button id="editCancelBtn">取消</button>
+        </div>
+    </div>
 </div>
 
 <div id="convModal" class="modal"><div class="modal-content"><div class="modal-header"><span>📁 我的对话</span><button id="closeModalBtn" class="icon-btn">✖️</button></div><ul id="convListUl"></ul><button id="modalNewConvBtn" class="new-conv-btn">➕ 新建对话</button></div></div>
@@ -96,6 +153,9 @@
     let currentApiKey = "";
     let currentModel = "deepseek-chat";
     let isLoading = false;
+
+    // 编辑待处理变量
+    let pendingEdit = { idx: null, callback: null };
 
     // DOM 元素
     const msgContainer = document.getElementById("messagesContainer");
@@ -117,6 +177,10 @@
     const modalNewConvBtn = document.getElementById("modalNewConvBtn");
     const closeHistoryModalBtn = document.getElementById("closeHistoryModalBtn");
     const historyListUl = document.getElementById("historyListUl");
+    const editModal = document.getElementById("editModal");
+    const editTextarea = document.getElementById("editTextarea");
+    const editConfirmBtn = document.getElementById("editConfirmBtn");
+    const editCancelBtn = document.getElementById("editCancelBtn");
 
     // ---------- 存储核心 ----------
     function saveAll() {
@@ -151,7 +215,7 @@
             conversations = [{
                 id: Date.now(),
                 title: "新对话",
-                messages: [{ role: "assistant", content: "✨ 欢迎！编辑消息时会自动填入原内容。", history: [] }]
+                messages: [{ role: "assistant", content: "✨ 欢迎！编辑消息时会自动弹出预填内容的对话框。", history: [] }]
             }];
         }
         const savedActive = localStorage.getItem("ds_activeConvId");
@@ -162,7 +226,7 @@
         }
         const curr = conversations.find(c => c.id === activeConvId);
         if (curr && (!curr.messages || curr.messages.length === 0)) {
-            curr.messages = [{ role: "assistant", content: "✨ 欢迎！编辑消息时会自动填入原内容。", history: [] }];
+            curr.messages = [{ role: "assistant", content: "✨ 欢迎！编辑消息时会自动弹出预填内容的对话框。", history: [] }];
         }
         saveAll();
         renderMessages();
@@ -193,6 +257,36 @@
             msg.history.push(oldContent);
             if (msg.history.length > 20) msg.history.shift();
         }
+    }
+
+    // 显示自定义编辑对话框
+    function showEditModal(idx, originalContent) {
+        pendingEdit.idx = idx;
+        editTextarea.value = originalContent;
+        editModal.style.display = "flex";
+    }
+
+    function closeEditModal() {
+        editModal.style.display = "none";
+        pendingEdit.idx = null;
+    }
+
+    async function confirmEdit() {
+        const newContent = editTextarea.value.trim();
+        if (newContent === "") {
+            closeEditModal();
+            return;
+        }
+        const idx = pendingEdit.idx;
+        closeEditModal();
+        const messages = getCurrentMessages();
+        if (idx >= messages.length) return;
+        const msg = messages[idx];
+        pushHistory(msg, msg.content);
+        msg.content = newContent;
+        const newMessages = messages.slice(0, idx+1);
+        saveCurrentMessages(newMessages);
+        await regenerateAfterEdit(newMessages);
     }
 
     function renderMessages() {
@@ -232,20 +326,16 @@
                 showMessageHistory(idx, msg.content, msg.history || []);
             };
             actions.appendChild(historyBtn);
-            // 编辑（仅用户）- 关键修复：使用函数闭包捕获 idx，但在回调中实时获取内容
+            // 编辑（仅用户） - 使用自定义模态框
             if (isUser) {
                 const editBtn = document.createElement("button");
                 editBtn.className = "action-btn";
                 editBtn.innerHTML = "✏️ 编辑";
                 editBtn.onclick = (e) => {
                     e.stopPropagation();
-                    // 实时从当前消息列表中获取最新的消息内容和索引
                     const currentMessages = getCurrentMessages();
                     if (idx < currentMessages.length) {
-                        const targetMsg = currentMessages[idx];
-                        editUserMessage(idx, targetMsg.content);
-                    } else {
-                        alert("消息索引错误");
+                        showEditModal(idx, currentMessages[idx].content);
                     }
                 };
                 actions.appendChild(editBtn);
@@ -348,26 +438,6 @@
             isLoading = false;
             sendBtn.classList.remove("disabled");
         }
-    }
-
-    // 编辑用户消息 - 直接接收原文内容
-    async function editUserMessage(idx, originalContent) {
-        if (isLoading) return;
-        if (typeof originalContent !== 'string') {
-            console.error("originalContent is not a string", originalContent);
-            alert("无法获取原消息内容，请刷新页面重试");
-            return;
-        }
-        const newContent = prompt("编辑消息内容:", originalContent);
-        if (newContent === null || newContent.trim() === "") return;
-        const messages = getCurrentMessages();
-        if (idx >= messages.length) return;
-        const msg = messages[idx];
-        pushHistory(msg, msg.content);
-        msg.content = newContent.trim();
-        const newMessages = messages.slice(0, idx+1);
-        saveCurrentMessages(newMessages);
-        await regenerateAfterEdit(newMessages);
     }
 
     async function regenerateAfterEdit(messagesWithoutAssistant) {
@@ -558,7 +628,7 @@
         input.click();
     }
 
-    // API Key
+    // API Key 管理
     function loadApiKey() {
         const saved = localStorage.getItem("deepseek_api_key");
         if (saved) {
@@ -641,7 +711,9 @@
             }
         });
         userInput.addEventListener("input", autoResizeTextarea);
-        window.addEventListener("click", (e) => { if (e.target === convModal) closeModalPanel(); if (e.target === msgHistoryModal) closeHistoryModalPanel(); });
+        window.addEventListener("click", (e) => { if (e.target === convModal) closeModalPanel(); if (e.target === msgHistoryModal) closeHistoryModalPanel(); if (e.target === editModal) closeEditModal(); });
+        editConfirmBtn.addEventListener("click", confirmEdit);
+        editCancelBtn.addEventListener("click", closeEditModal);
     }
 
     function bootstrap() {
