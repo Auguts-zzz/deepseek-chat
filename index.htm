@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>DeepSeek · 0427-02</title>
+    <title>DeepSeek 0427-03</title>
     <style>
-        /* 样式与之前完全相同，略... 为节省篇幅，此处省略，但实际代码会包含完整样式 */
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { background: #e9eef4; font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 0; }
         .app { max-width: 100%; width: 100%; background: white; display: flex; flex-direction: column; height: 100vh; }
@@ -80,7 +79,7 @@
         </div>
         <button id="sendButton" class="send-btn">➤</button>
     </div>
-    <div class="footer-note">🔒 编辑消息会自动预填原内容（已修复）</div>
+    <div class="footer-note">🔒 编辑消息会自动预填原内容（终极修复）</div>
 </div>
 
 <div id="convModal" class="modal"><div class="modal-content"><div class="modal-header"><span>📁 我的对话</span><button id="closeModalBtn" class="icon-btn">✖️</button></div><ul id="convListUl"></ul><button id="modalNewConvBtn" class="new-conv-btn">➕ 新建对话</button></div></div>
@@ -233,16 +232,21 @@
                 showMessageHistory(idx, msg.content, msg.history || []);
             };
             actions.appendChild(historyBtn);
-            // 编辑（仅用户）- 修复：直接传递 msg.content 字符串
+            // 编辑（仅用户）- 关键修复：使用函数闭包捕获 idx，但在回调中实时获取内容
             if (isUser) {
                 const editBtn = document.createElement("button");
                 editBtn.className = "action-btn";
                 editBtn.innerHTML = "✏️ 编辑";
-                // 获取当前消息的原文（确保是最新的）
-                const originalContent = msg.content;
                 editBtn.onclick = (e) => {
                     e.stopPropagation();
-                    editUserMessage(idx, originalContent);
+                    // 实时从当前消息列表中获取最新的消息内容和索引
+                    const currentMessages = getCurrentMessages();
+                    if (idx < currentMessages.length) {
+                        const targetMsg = currentMessages[idx];
+                        editUserMessage(idx, targetMsg.content);
+                    } else {
+                        alert("消息索引错误");
+                    }
                 };
                 actions.appendChild(editBtn);
             }
@@ -346,11 +350,14 @@
         }
     }
 
-    // 编辑用户消息 - 确保预填充原内容
+    // 编辑用户消息 - 直接接收原文内容
     async function editUserMessage(idx, originalContent) {
         if (isLoading) return;
-        // 调试：弹窗显示原内容（可选，确认传递正确）
-        // alert("原内容：" + originalContent);
+        if (typeof originalContent !== 'string') {
+            console.error("originalContent is not a string", originalContent);
+            alert("无法获取原消息内容，请刷新页面重试");
+            return;
+        }
         const newContent = prompt("编辑消息内容:", originalContent);
         if (newContent === null || newContent.trim() === "") return;
         const messages = getCurrentMessages();
@@ -551,7 +558,7 @@
         input.click();
     }
 
-    // API Key 管理
+    // API Key
     function loadApiKey() {
         const saved = localStorage.getItem("deepseek_api_key");
         if (saved) {
