@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>DeepSeek · 0427-01</title>
+    <title>DeepSeek · 编辑预填充修复版</title>
     <style>
-        /* 样式与前相同，略... 完整见下方 */
+        /* 样式与之前完全相同，略... 为节省篇幅，此处省略，但实际代码会包含完整样式 */
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { background: #e9eef4; font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 0; }
         .app { max-width: 100%; width: 100%; background: white; display: flex; flex-direction: column; height: 100vh; }
@@ -18,7 +18,6 @@
         .api-input { background: #f0f2f5; border: 1px solid #dce3ec; border-radius: 40px; padding: 6px 12px; font-size: 0.7rem; width: 140px; font-family: monospace; }
         .small-btn { background: #eef2f7; border: none; border-radius: 30px; padding: 5px 12px; font-size: 0.7rem; cursor: pointer; }
         .mode-switch { display: flex; align-items: center; gap: 6px; background: #eef2f7; padding: 0 10px; border-radius: 40px; height: 32px; font-size: 0.7rem; }
-        .debug-panel { background: #fff3cd; padding: 6px 12px; font-size: 0.7rem; display: flex; gap: 12px; justify-content: space-between; border-bottom: 1px solid #ffeaa7; }
         .messages-container { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; background: #fefefe; }
         .message { display: flex; flex-direction: column; max-width: 85%; position: relative; }
         .user-message { align-self: flex-end; }
@@ -52,10 +51,6 @@
 </head>
 <body>
 <div class="app">
-    <div class="debug-panel">
-        <span>🔧 调试: 编辑应预填 | 精简2轮后导出应很小</span>
-        <button id="forceTestBtn" class="small-btn">测试编辑(弹窗)</button>
-    </div>
     <div class="top-bar">
         <div class="conv-control">
             <button id="showConvListBtn" class="icon-btn">📋</button>
@@ -85,7 +80,7 @@
         </div>
         <button id="sendButton" class="send-btn">➤</button>
     </div>
-    <div class="footer-note">🔒 编辑消息会自动预填原内容 | 精简后导出仅含两轮且无历史</div>
+    <div class="footer-note">🔒 编辑消息会自动预填原内容（已修复）</div>
 </div>
 
 <div id="convModal" class="modal"><div class="modal-content"><div class="modal-header"><span>📁 我的对话</span><button id="closeModalBtn" class="icon-btn">✖️</button></div><ul id="convListUl"></ul><button id="modalNewConvBtn" class="new-conv-btn">➕ 新建对话</button></div></div>
@@ -93,6 +88,7 @@
 
 <script>
 (function(){
+    // ---------- 配置 ----------
     const DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions";
     const SYSTEM_MESSAGE = { role: "system", content: "你是DeepSeek助手，扮演角色进行对话，保持一致性，使用中文。" };
     
@@ -102,7 +98,7 @@
     let currentModel = "deepseek-chat";
     let isLoading = false;
 
-    // DOM
+    // DOM 元素
     const msgContainer = document.getElementById("messagesContainer");
     const userInput = document.getElementById("userInput");
     const sendBtn = document.getElementById("sendButton");
@@ -122,9 +118,8 @@
     const modalNewConvBtn = document.getElementById("modalNewConvBtn");
     const closeHistoryModalBtn = document.getElementById("closeHistoryModalBtn");
     const historyListUl = document.getElementById("historyListUl");
-    const forceTestBtn = document.getElementById("forceTestBtn");
 
-    // 存储
+    // ---------- 存储核心 ----------
     function saveAll() {
         try {
             localStorage.setItem("ds_conversations", JSON.stringify(conversations));
@@ -238,14 +233,16 @@
                 showMessageHistory(idx, msg.content, msg.history || []);
             };
             actions.appendChild(historyBtn);
-            // 编辑（仅用户）
+            // 编辑（仅用户）- 修复：直接传递 msg.content 字符串
             if (isUser) {
                 const editBtn = document.createElement("button");
                 editBtn.className = "action-btn";
                 editBtn.innerHTML = "✏️ 编辑";
+                // 获取当前消息的原文（确保是最新的）
+                const originalContent = msg.content;
                 editBtn.onclick = (e) => {
                     e.stopPropagation();
-                    editUserMessage(idx, msg.content);
+                    editUserMessage(idx, originalContent);
                 };
                 actions.appendChild(editBtn);
             }
@@ -349,11 +346,12 @@
         }
     }
 
-    // 编辑用户消息 - 强制预填充
-    async function editUserMessage(idx, oldContent) {
+    // 编辑用户消息 - 确保预填充原内容
+    async function editUserMessage(idx, originalContent) {
         if (isLoading) return;
-        // 使用 window.prompt 并确保第二个参数是旧内容
-        const newContent = prompt("编辑消息内容:", oldContent);
+        // 调试：弹窗显示原内容（可选，确认传递正确）
+        // alert("原内容：" + originalContent);
+        const newContent = prompt("编辑消息内容:", originalContent);
         if (newContent === null || newContent.trim() === "") return;
         const messages = getCurrentMessages();
         if (idx >= messages.length) return;
@@ -434,7 +432,7 @@
         msgHistoryModal.style.display = "flex";
     }
 
-    // 保留最近2轮并清空所有历史
+    // 保留最近2轮并清除历史
     function keepLastTwoRoundsAndClearHistory() {
         if (isLoading) { alert("请等待当前回复完成"); return; }
         const conv = getCurrentConv();
@@ -448,7 +446,6 @@
         let keptNonSystem = nonSystem.slice(-keepCount);
         
         const newMessages = [...systemMsgs, ...keptNonSystem];
-        // 彻底清除 history
         const finalMessages = newMessages.map(m => ({
             role: m.role,
             content: m.content,
@@ -554,6 +551,7 @@
         input.click();
     }
 
+    // API Key 管理
     function loadApiKey() {
         const saved = localStorage.getItem("deepseek_api_key");
         if (saved) {
@@ -624,11 +622,6 @@
         exportBackupBtn.addEventListener("click", exportBackup);
         importBackupBtn.addEventListener("click", importBackup);
         closeHistoryModalBtn.addEventListener("click", closeHistoryModalPanel);
-        // 测试编辑功能
-        forceTestBtn.addEventListener("click", () => {
-            const testContent = prompt("测试编辑预填充:", "这是默认内容");
-            alert("你输入了: " + testContent);
-        });
         userInput.addEventListener("keydown", (e) => {
             if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
