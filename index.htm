@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>DeepSeek · 保留最近2轮并清除历史</title>
+    <title>DeepSeek · 0427-01</title>
     <style>
+        /* 样式与前相同，略... 完整见下方 */
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { background: #e9eef4; font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 0; }
         .app { max-width: 100%; width: 100%; background: white; display: flex; flex-direction: column; height: 100vh; }
@@ -17,6 +18,7 @@
         .api-input { background: #f0f2f5; border: 1px solid #dce3ec; border-radius: 40px; padding: 6px 12px; font-size: 0.7rem; width: 140px; font-family: monospace; }
         .small-btn { background: #eef2f7; border: none; border-radius: 30px; padding: 5px 12px; font-size: 0.7rem; cursor: pointer; }
         .mode-switch { display: flex; align-items: center; gap: 6px; background: #eef2f7; padding: 0 10px; border-radius: 40px; height: 32px; font-size: 0.7rem; }
+        .debug-panel { background: #fff3cd; padding: 6px 12px; font-size: 0.7rem; display: flex; gap: 12px; justify-content: space-between; border-bottom: 1px solid #ffeaa7; }
         .messages-container { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; background: #fefefe; }
         .message { display: flex; flex-direction: column; max-width: 85%; position: relative; }
         .user-message { align-self: flex-end; }
@@ -50,6 +52,10 @@
 </head>
 <body>
 <div class="app">
+    <div class="debug-panel">
+        <span>🔧 调试: 编辑应预填 | 精简2轮后导出应很小</span>
+        <button id="forceTestBtn" class="small-btn">测试编辑(弹窗)</button>
+    </div>
     <div class="top-bar">
         <div class="conv-control">
             <button id="showConvListBtn" class="icon-btn">📋</button>
@@ -79,7 +85,7 @@
         </div>
         <button id="sendButton" class="send-btn">➤</button>
     </div>
-    <div class="footer-note">🔒 API Key 仅存本地 | 点击“保留最近2轮并清除历史”可彻底精简对话</div>
+    <div class="footer-note">🔒 编辑消息会自动预填原内容 | 精简后导出仅含两轮且无历史</div>
 </div>
 
 <div id="convModal" class="modal"><div class="modal-content"><div class="modal-header"><span>📁 我的对话</span><button id="closeModalBtn" class="icon-btn">✖️</button></div><ul id="convListUl"></ul><button id="modalNewConvBtn" class="new-conv-btn">➕ 新建对话</button></div></div>
@@ -87,7 +93,6 @@
 
 <script>
 (function(){
-    // ---------- 配置 ----------
     const DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions";
     const SYSTEM_MESSAGE = { role: "system", content: "你是DeepSeek助手，扮演角色进行对话，保持一致性，使用中文。" };
     
@@ -97,7 +102,7 @@
     let currentModel = "deepseek-chat";
     let isLoading = false;
 
-    // DOM 元素
+    // DOM
     const msgContainer = document.getElementById("messagesContainer");
     const userInput = document.getElementById("userInput");
     const sendBtn = document.getElementById("sendButton");
@@ -117,8 +122,9 @@
     const modalNewConvBtn = document.getElementById("modalNewConvBtn");
     const closeHistoryModalBtn = document.getElementById("closeHistoryModalBtn");
     const historyListUl = document.getElementById("historyListUl");
+    const forceTestBtn = document.getElementById("forceTestBtn");
 
-    // ---------- 存储核心 ----------
+    // 存储
     function saveAll() {
         try {
             localStorage.setItem("ds_conversations", JSON.stringify(conversations));
@@ -169,15 +175,8 @@
         updateTitle();
     }
 
-    function getCurrentConv() {
-        return conversations.find(c => c.id === activeConvId);
-    }
-
-    function getCurrentMessages() {
-        const conv = getCurrentConv();
-        return conv ? conv.messages : [];
-    }
-
+    function getCurrentConv() { return conversations.find(c => c.id === activeConvId); }
+    function getCurrentMessages() { const conv = getCurrentConv(); return conv ? conv.messages : []; }
     function saveCurrentMessages(messages) {
         const conv = getCurrentConv();
         if (conv) {
@@ -295,7 +294,7 @@
     async function callAPI(messages) {
         if (!currentApiKey) throw new Error("请先保存 API Key");
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 120000); // 2分钟超时
+        const timeoutId = setTimeout(() => controller.abort(), 120000);
         try {
             const res = await fetch(DEEPSEEK_API_URL, {
                 method: "POST",
@@ -318,7 +317,6 @@
         }
     }
 
-    // 发送新消息
     async function sendMessage(text) {
         if (isLoading) { alert("请等待上一条回复完成"); return; }
         const conv = getCurrentConv();
@@ -351,9 +349,10 @@
         }
     }
 
-    // 编辑用户消息（预填原内容已修复）
+    // 编辑用户消息 - 强制预填充
     async function editUserMessage(idx, oldContent) {
         if (isLoading) return;
+        // 使用 window.prompt 并确保第二个参数是旧内容
         const newContent = prompt("编辑消息内容:", oldContent);
         if (newContent === null || newContent.trim() === "") return;
         const messages = getCurrentMessages();
@@ -435,7 +434,7 @@
         msgHistoryModal.style.display = "flex";
     }
 
-    // ---------- 保留最近2轮并清除所有历史记录 ----------
+    // 保留最近2轮并清空所有历史
     function keepLastTwoRoundsAndClearHistory() {
         if (isLoading) { alert("请等待当前回复完成"); return; }
         const conv = getCurrentConv();
@@ -443,34 +442,22 @@
         let messages = conv.messages;
         if (messages.length === 0) { alert("没有消息可精简"); return; }
         
-        // 分离系统消息（通常第一条是系统消息）
         const systemMsgs = messages.filter(m => m.role === "system");
         const nonSystem = messages.filter(m => m.role !== "system");
-        
-        // 保留最后2轮（4条消息）
-        let keepCount = 4; // 2轮 = 4条消息
+        const keepCount = 4; // 2轮 = 4条消息
         let keptNonSystem = nonSystem.slice(-keepCount);
         
-        if (keptNonSystem.length === nonSystem.length) {
-            if (!confirm("当前对话不足2轮，是否仍然执行？执行后不会删除任何消息，但会清空所有消息的历史版本。")) {
-                return;
-            }
-        }
-        
-        // 构建新消息：系统消息 + 保留的最后2轮
         const newMessages = [...systemMsgs, ...keptNonSystem];
-        // 彻底清除每条消息的 history 字段（设为空数组），并移除版本栈
+        // 彻底清除 history
         const finalMessages = newMessages.map(m => ({
             role: m.role,
             content: m.content,
-            history: []   // 清空历史版本
+            history: []
         }));
         
-        // 替换当前对话的消息，同时重置版本栈（只保留当前这一个版本）
         conv.messages = finalMessages;
         conv.versionStack = [JSON.parse(JSON.stringify(finalMessages))];
         conv.currentVersionIndex = 0;
-        // 更新标题，标记已精简
         if (!conv.title.includes("(精简2轮)")) {
             conv.title = conv.title + " (精简2轮)";
         }
@@ -567,7 +554,6 @@
         input.click();
     }
 
-    // API Key 管理
     function loadApiKey() {
         const saved = localStorage.getItem("deepseek_api_key");
         if (saved) {
@@ -628,7 +614,7 @@
         saveApiBtn.addEventListener("click", saveApiKey);
         newConvBtn.addEventListener("click", newConversation);
         keepTwoRoundsBtn.addEventListener("click", () => {
-            if (confirm("⚠️ 此操作将删除当前对话中超过最近2轮的所有消息，并清除所有历史版本（编辑记录）。建议先点击「💾 备份」。是否继续？")) {
+            if (confirm("⚠️ 此操作将删除当前对话中超过最近2轮的所有消息，并清除所有历史版本。建议先点击「💾 备份」。是否继续？")) {
                 keepLastTwoRoundsAndClearHistory();
             }
         });
@@ -638,6 +624,11 @@
         exportBackupBtn.addEventListener("click", exportBackup);
         importBackupBtn.addEventListener("click", importBackup);
         closeHistoryModalBtn.addEventListener("click", closeHistoryModalPanel);
+        // 测试编辑功能
+        forceTestBtn.addEventListener("click", () => {
+            const testContent = prompt("测试编辑预填充:", "这是默认内容");
+            alert("你输入了: " + testContent);
+        });
         userInput.addEventListener("keydown", (e) => {
             if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
