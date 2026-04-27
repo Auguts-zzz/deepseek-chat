@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>DeepSeek · 最终完整版（可精简对话）</title>
+    <title>DeepSeek · 最终版（可保留最近N轮并清除历史）</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { background: #e9eef4; font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 0; }
@@ -55,7 +55,7 @@
             <button id="showConvListBtn" class="icon-btn">📋</button>
             <span id="currentConvName" class="conv-name">对话</span>
             <button id="newConvBtn" class="icon-btn">➕</button>
-            <button id="trimCurrentBtn" class="small-btn" style="background:#ffe0e0;">✂️ 精简保留最近15轮</button>
+            <button id="keepTwoRoundsBtn" class="small-btn" style="background:#ffd966;">✂️ 保留最近2轮并清除历史</button>
             <button id="exportBackupBtn" class="small-btn">💾 备份</button>
             <button id="importBackupBtn" class="small-btn">📂 恢复</button>
         </div>
@@ -79,7 +79,7 @@
         </div>
         <button id="sendButton" class="send-btn">➤</button>
     </div>
-    <div class="footer-note">🔒 API Key 仅存本地 | 编辑时自动填入原内容 | 点击“精简保留最近15轮”可删除早期消息</div>
+    <div class="footer-note">🔒 API Key 仅存本地 | 点击“保留最近2轮并清除历史”可彻底精简对话</div>
 </div>
 
 <div id="convModal" class="modal"><div class="modal-content"><div class="modal-header"><span>📁 我的对话</span><button id="closeModalBtn" class="icon-btn">✖️</button></div><ul id="convListUl"></ul><button id="modalNewConvBtn" class="new-conv-btn">➕ 新建对话</button></div></div>
@@ -107,7 +107,7 @@
     const convNameSpan = document.getElementById("currentConvName");
     const showConvListBtn = document.getElementById("showConvListBtn");
     const newConvBtn = document.getElementById("newConvBtn");
-    const trimCurrentBtn = document.getElementById("trimCurrentBtn");
+    const keepTwoRoundsBtn = document.getElementById("keepTwoRoundsBtn");
     const exportBackupBtn = document.getElementById("exportBackupBtn");
     const importBackupBtn = document.getElementById("importBackupBtn");
     const convModal = document.getElementById("convModal");
@@ -295,7 +295,7 @@
     async function callAPI(messages) {
         if (!currentApiKey) throw new Error("请先保存 API Key");
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        const timeoutId = setTimeout(() => controller.abort(), 120000); // 2分钟超时
         try {
             const res = await fetch(DEEPSEEK_API_URL, {
                 method: "POST",
@@ -351,10 +351,9 @@
         }
     }
 
-    // 编辑用户消息（确保预填原内容）
+    // 编辑用户消息（预填原内容已修复）
     async function editUserMessage(idx, oldContent) {
         if (isLoading) return;
-        // 关键：第二个参数 oldContent 会被自动填入输入框
         const newContent = prompt("编辑消息内容:", oldContent);
         if (newContent === null || newContent.trim() === "") return;
         const messages = getCurrentMessages();
@@ -436,48 +435,49 @@
         msgHistoryModal.style.display = "flex";
     }
 
-    // ---------- 精简当前对话（保留最近15轮）----------
-    function trimToLastRounds(rounds = 15) {
+    // ---------- 保留最近2轮并清除所有历史记录 ----------
+    function keepLastTwoRoundsAndClearHistory() {
         if (isLoading) { alert("请等待当前回复完成"); return; }
         const conv = getCurrentConv();
         if (!conv) return;
         let messages = conv.messages;
         if (messages.length === 0) { alert("没有消息可精简"); return; }
         
-        // 分离系统消息（通常第一条是系统消息，也可能有多个，但一般只有一个）
+        // 分离系统消息（通常第一条是系统消息）
         const systemMsgs = messages.filter(m => m.role === "system");
         const nonSystem = messages.filter(m => m.role !== "system");
         
-        // 保留最近 rounds 轮，一轮 = user + assistant，即 2 条消息
-        let keepCount = rounds * 2;
+        // 保留最后2轮（4条消息）
+        let keepCount = 4; // 2轮 = 4条消息
         let keptNonSystem = nonSystem.slice(-keepCount);
         
         if (keptNonSystem.length === nonSystem.length) {
-            alert("当前消息数不足15轮，无需精简");
-            return;
+            if (!confirm("当前对话不足2轮，是否仍然执行？执行后不会删除任何消息，但会清空所有消息的历史版本。")) {
+                return;
+            }
         }
         
+        // 构建新消息：系统消息 + 保留的最后2轮
         const newMessages = [...systemMsgs, ...keptNonSystem];
-        // 确保每条消息的 history 字段保留（复制原有 history）
+        // 彻底清除每条消息的 history 字段（设为空数组），并移除版本栈
         const finalMessages = newMessages.map(m => ({
             role: m.role,
             content: m.content,
-            history: m.history ? [...m.history] : []
+            history: []   // 清空历史版本
         }));
         
-        // 直接替换当前对话的消息列表，并重置版本栈（避免历史版本引用旧消息）
+        // 替换当前对话的消息，同时重置版本栈（只保留当前这一个版本）
         conv.messages = finalMessages;
-        // 重置版本栈，只保留当前这一个版本
         conv.versionStack = [JSON.parse(JSON.stringify(finalMessages))];
         conv.currentVersionIndex = 0;
-        // 更新标题（可选）
-        if (conv.title && !conv.title.includes("(精简)")) {
-            conv.title = conv.title + " (精简)";
+        // 更新标题，标记已精简
+        if (!conv.title.includes("(精简2轮)")) {
+            conv.title = conv.title + " (精简2轮)";
         }
         saveAll();
         renderMessages();
         updateTitle();
-        alert(`已精简对话，保留了最近 ${rounds} 轮消息（共 ${keptNonSystem.length} 条）。原早期消息已删除。`);
+        alert(`已保留最近2轮对话（共${keptNonSystem.length}条消息），并清除了所有历史版本。导出的备份将只包含这些内容。`);
     }
 
     // 对话管理
@@ -627,9 +627,9 @@
         });
         saveApiBtn.addEventListener("click", saveApiKey);
         newConvBtn.addEventListener("click", newConversation);
-        trimCurrentBtn.addEventListener("click", () => {
-            if (confirm("精简操作会删除当前对话中超过最近15轮的消息，不可逆。建议先点击「💾 备份」。是否继续？")) {
-                trimToLastRounds(15);
+        keepTwoRoundsBtn.addEventListener("click", () => {
+            if (confirm("⚠️ 此操作将删除当前对话中超过最近2轮的所有消息，并清除所有历史版本（编辑记录）。建议先点击「💾 备份」。是否继续？")) {
+                keepLastTwoRoundsAndClearHistory();
             }
         });
         showConvListBtn.addEventListener("click", openModalPanel);
