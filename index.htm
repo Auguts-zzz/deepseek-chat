@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>DeepSeek · 三模型自由切换版</title>
+    <title>DeepSeek · 最新模型 + 版本历史修复</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { background: #e9eef4; font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 0; }
@@ -107,8 +107,8 @@
             <input type="password" id="apiKeyInput" class="api-input" placeholder="API Key" autocomplete="off">
             <button id="saveApiBtn" class="small-btn">保存</button>
             <select id="modelSelect" class="model-select">
-                <option value="deepseek-chat">V4 (当前最新)</option>
-                <option value="deepseek-v3.2">V3 (稳定版)</option>
+                <option value="deepseek-v4-flash">V4-Flash (快速)</option>
+                <option value="deepseek-v4-pro">V4-Pro (增强)</option>
                 <option value="deepseek-reasoner">R1 (深度思考)</option>
             </select>
         </div>
@@ -124,7 +124,7 @@
         </div>
         <button id="sendButton" class="send-btn">➤</button>
     </div>
-    <div class="footer-note">🔒 可自由切换 V4 / V3 / R1 模型，编辑自动预填原内容</div>
+    <div class="footer-note">🔒 可选择 V4-Flash / V4-Pro / R1，历史版本功能已修复</div>
 </div>
 
 <!-- 自定义编辑模态框 -->
@@ -151,7 +151,7 @@
     let conversations = [];
     let activeConvId = null;
     let currentApiKey = "";
-    let currentModel = "deepseek-chat";  // 默认 V4
+    let currentModel = "deepseek-v4-flash";  // 默认快速版
     let isLoading = false;
 
     // DOM 元素
@@ -212,7 +212,7 @@
             conversations = [{
                 id: Date.now(),
                 title: "新对话",
-                messages: [{ role: "assistant", content: "✨ 欢迎！您可以在顶部下拉框选择 V4 / V3 / R1 模型。", history: [] }]
+                messages: [{ role: "assistant", content: "✨ 欢迎！您可以在顶部下拉框选择 V4-Flash / V4-Pro / R1 模型。", history: [] }]
             }];
         }
         const savedActive = localStorage.getItem("ds_activeConvId");
@@ -223,7 +223,7 @@
         }
         const curr = conversations.find(c => c.id === activeConvId);
         if (curr && (!curr.messages || curr.messages.length === 0)) {
-            curr.messages = [{ role: "assistant", content: "✨ 欢迎！您可以在顶部下拉框选择 V4 / V3 / R1 模型。", history: [] }];
+            curr.messages = [{ role: "assistant", content: "✨ 欢迎！您可以在顶部下拉框选择 V4-Flash / V4-Pro / R1 模型。", history: [] }];
         }
         saveAll();
         renderMessages();
@@ -248,18 +248,19 @@
         }
     }
 
-    function pushHistory(msg, oldContent) {
+    // 保存历史版本：将旧内容存入消息的 history 数组
+    function saveHistoryVersion(msg, oldContent) {
         if (!msg.history) msg.history = [];
+        // 避免重复保存相同内容（连续调用时）
         if (msg.history.length === 0 || msg.history[msg.history.length-1] !== oldContent) {
             msg.history.push(oldContent);
-            if (msg.history.length > 20) msg.history.shift();
+            if (msg.history.length > 20) msg.history.shift(); // 最多保留20个版本
         }
     }
 
     function showEditModal(idx, originalContent) {
         editTextarea.value = originalContent;
         editModal.style.display = "flex";
-        // 存储当前要编辑的消息索引
         window._pendingEditIdx = idx;
     }
 
@@ -279,8 +280,10 @@
         const messages = getCurrentMessages();
         if (idx === null || idx >= messages.length) return;
         const msg = messages[idx];
-        pushHistory(msg, msg.content);
+        // 保存旧版本
+        saveHistoryVersion(msg, msg.content);
         msg.content = newContent;
+        // 删除该消息之后的所有消息（因为修改了历史）
         const newMessages = messages.slice(0, idx+1);
         saveCurrentMessages(newMessages);
         await regenerateAfterEdit(newMessages);
@@ -470,7 +473,8 @@
         }
         if (lastAssistantIdx === -1) { alert("没有可重新生成的消息"); return; }
         const assistantMsg = messages[lastAssistantIdx];
-        pushHistory(assistantMsg, assistantMsg.content);
+        // 保存历史版本
+        saveHistoryVersion(assistantMsg, assistantMsg.content);
         const truncated = messages.slice(0, lastAssistantIdx);
         saveCurrentMessages(truncated);
         await regenerateAfterEdit(truncated);
@@ -493,7 +497,8 @@
                     const messages = getCurrentMessages();
                     if (idx < messages.length) {
                         const currentMsg = messages[idx];
-                        pushHistory(currentMsg, currentMsg.content);
+                        // 保存当前版本到历史
+                        saveHistoryVersion(currentMsg, currentMsg.content);
                         currentMsg.content = ver;
                         saveCurrentMessages(messages);
                         msgHistoryModal.style.display = "none";
@@ -523,7 +528,7 @@
         const finalMessages = newMessages.map(m => ({
             role: m.role,
             content: m.content,
-            history: []
+            history: []   // 精简后清空所有历史版本
         }));
         
         conv.messages = finalMessages;
@@ -666,14 +671,14 @@
     function saveModelPreference() {
         currentModel = modelSelect.value;
         localStorage.setItem("deepseek_model", currentModel);
-        // 可选提示
+        let modelName = "";
+        if (currentModel === "deepseek-v4-flash") modelName = "V4-Flash";
+        else if (currentModel === "deepseek-v4-pro") modelName = "V4-Pro";
+        else if (currentModel === "deepseek-reasoner") modelName = "R1";
         const tip = document.createElement("div");
         tip.style.position = "fixed"; tip.style.bottom = "70px"; tip.style.left = "20px";
         tip.style.background = "#1f7e8c"; tip.style.color = "white"; tip.style.padding = "6px 12px";
         tip.style.borderRadius = "20px"; tip.style.fontSize = "0.7rem"; tip.style.zIndex = "999";
-        let modelName = "V4";
-        if (currentModel === "deepseek-v3.2") modelName = "V3";
-        if (currentModel === "deepseek-reasoner") modelName = "R1";
         tip.innerText = `已切换至 ${modelName} 模型`;
         document.body.appendChild(tip);
         setTimeout(() => tip.remove(), 1500);
