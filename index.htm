@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=yes,viewport-fit=cover">
-<title>261014 13:13</title>
+<title>261014 14:12</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{background:#e9eef4;font-family:system-ui,sans-serif;display:flex;justify-content:center;min-height:100vh}
@@ -232,16 +232,23 @@ copyBtn.className="action-btn";
 copyBtn.innerHTML="📋 复制";
 copyBtn.onclick=async e=>{e.stopPropagation();await navigator.clipboard.writeText(msg.content);copyBtn.innerHTML="✅";setTimeout(()=>copyBtn.innerHTML="📋 复制",1000);};
 actions.appendChild(copyBtn);
-if(msg.versions&&msg.versions.length>1){
-const nav=document.createElement("span");
-nav.className="version-nav";
-const prev=document.createElement("button");prev.textContent="◀";
-prev.onclick=e=>{e.stopPropagation();switchMessageVersion(idx,msg.versionIndex-1);};
-const label=document.createElement("span");label.className="version-label";label.textContent=`${msg.versionIndex+1}/${msg.versions.length}`;
-const next=document.createElement("button");next.textContent="▶";
-next.onclick=e=>{e.stopPropagation();switchMessageVersion(idx,msg.versionIndex+1);};
-nav.appendChild(prev);nav.appendChild(label);nav.appendChild(next);
-actions.appendChild(nav);
+// 在 renderMessages 中，替换原来的版本导航部分为：
+if (msg.versions && msg.versions.length > 1) {
+    const versionNav = document.createElement("span");
+    versionNav.className = "version-nav";
+    const prevBtn = document.createElement("button");
+    prevBtn.textContent = "◀";
+    prevBtn.onclick = (e) => { e.stopPropagation(); switchMessageVersion(idx, msg.versionIndex - 1); };
+    const label = document.createElement("span");
+    label.className = "version-label";
+    label.textContent = `${msg.versionIndex + 1}/${msg.versions.length}`;
+    const nextBtn = document.createElement("button");
+    nextBtn.textContent = "▶";
+    nextBtn.onclick = (e) => { e.stopPropagation(); switchMessageVersion(idx, msg.versionIndex + 1); };
+    versionNav.appendChild(prevBtn);
+    versionNav.appendChild(label);
+    versionNav.appendChild(nextBtn);
+    actions.appendChild(versionNav);
 }
 const historyBtn=document.createElement("button");
 historyBtn.className="action-btn";historyBtn.innerHTML="📜 历史";
@@ -271,26 +278,32 @@ msgContainer.appendChild(div);
 msgContainer.scrollTop=msgContainer.scrollHeight;
 }
 
-function switchMessageVersion(idx,newIndex){
-const conv=getCurrentConv();if(!conv)return;
-const msgs=conv.messages;const msg=msgs[idx];
-if(!msg||!msg.versions)return;
-if(newIndex<0||newIndex>=msg.versions.length)return;
-msg.versionIndex=newIndex;
-msg.content=msg.versions[newIndex];
-if(msg.role==="user"){
-for(let i=idx+1;i<msgs.length;i++){
-if(msgs[i].role==="assistant"){
-const ai=msgs[i];
-if(ai.versions&&ai.versions.length>0){
-const t=Math.min(newIndex,ai.versions.length-1);
-ai.versionIndex=t;ai.content=ai.versions[t];
-}
-break;
-}
-}
-}
-saveAll();renderMessages();
+function switchMessageVersion(idx, newIndex) {
+    const conv = getCurrentConv();
+    if (!conv) return;
+    const msgs = conv.messages;
+    const msg = msgs[idx];
+    if (!msg || !msg.versions) return;
+    if (newIndex < 0 || newIndex >= msg.versions.length) return;
+
+    msg.versionIndex = newIndex;
+    msg.content = msg.versions[newIndex];
+
+    // 如果切换的是用户消息，联动后续所有 AI 消息
+    if (msg.role === "user") {
+        for (let i = idx + 1; i < msgs.length; i++) {
+            if (msgs[i].role === "assistant") {
+                const ai = msgs[i];
+                if (ai.versions && ai.versions.length > 0) {
+                    const target = Math.min(newIndex, ai.versions.length - 1);
+                    ai.versionIndex = target;
+                    ai.content = ai.versions[target];
+                }
+            }
+        }
+    }
+    saveAll();
+    renderMessages();
 }
 
 function updateTitle(){const c=getCurrentConv();convNameSpan.innerText=c?c.title:"对话";}
@@ -355,35 +368,64 @@ saveCurrentMessages(newMsgs);
 await regenerateAfterEdit(newMsgs);
 }
 
-async function regenerateAfterEdit(msgsWithoutAI){
-if(isLoading)return;
-isLoading=true;sendBtn.classList.add("disabled");showLoading();
-try{
-const apiMsgs=msgsWithoutAI.map(m=>({role:m.role,content:m.content}));
-const reply=await callAPI(apiMsgs);
-hideLoading();
-const newAI={role:"assistant",content:reply,versions:[reply],versionIndex:0};
-saveCurrentMessages([...msgsWithoutAI,newAI]);
-}catch(err){
-hideLoading();
-const errMsg=err.message||"调用失败";
-const errObj={role:"assistant",content:`⚠️ 错误：${errMsg}`,versions:[`⚠️ 错误：${errMsg}`],versionIndex:0};
-saveCurrentMessages([...msgsWithoutAI,errObj]);
-}finally{isLoading=false;sendBtn.classList.remove("disabled");}
+async function regenerateAfterEdit(msgsWithoutAI) {
+    if (isLoading) return;
+    isLoading = true;
+    sendBtn.classList.add("disabled");
+    showLoading();
+    try {
+        const apiMsgs = msgsWithoutAI.map(m => ({ role: m.role, content: m.content }));
+        const reply = await callAPI(apiMsgs);
+        hideLoading();
+        // 检查最后一条是否是被截断的 AI 消息（即需要追加版本）
+        const conv = getCurrentConv();
+        const originalMsgs = conv.messages;
+        // 如果截断前的最后一条是 AI，并且它已经有 versions，就追加新版本
+        const lastOriginal = originalMsgs[originalMsgs.length - 1];
+        if (lastOriginal && lastOriginal.role === "assistant" && lastOriginal.versions) {
+            lastOriginal.versions.push(reply);
+            lastOriginal.versionIndex = lastOriginal.versions.length - 1;
+            lastOriginal.content = reply;
+            saveAll();
+            renderMessages();
+        } else {
+            const newAI = { role: "assistant", content: reply, versions: [reply], versionIndex: 0 };
+            saveCurrentMessages([...msgsWithoutAI, newAI]);
+        }
+    } catch (err) {
+        hideLoading();
+        const errMsg = err.message || "调用失败";
+        const errObj = { role: "assistant", content: `⚠️ 错误：${errMsg}`, versions: [`⚠️ 错误：${errMsg}`], versionIndex: 0 };
+        saveCurrentMessages([...msgsWithoutAI, errObj]);
+    } finally {
+        isLoading = false;
+        sendBtn.classList.remove("disabled");
+    }
 }
 
-async function regenerateLastAssistant(){
-if(isLoading)return;
-const msgs=getCurrentMessages();
-let lastAI=-1;
-for(let i=msgs.length-1;i>=0;i--){if(msgs[i].role==="assistant"){lastAI=i;break;}}
-if(lastAI===-1){alert("没有可重新生成的消息");return;}
-const assistantMsg=msgs[lastAI];
-if(!assistantMsg.versions)assistantMsg.versions=[assistantMsg.content];
-// 直接把当前内容作为历史版本保留在 versions 中（已存在），然后基于截断的消息重新生成
-const truncated=msgs.slice(0,lastAI);
-saveCurrentMessages(truncated);
-await regenerateAfterEdit(truncated);
+async function regenerateLastAssistant() {
+    if (isLoading) return;
+    const msgs = getCurrentMessages();
+    let lastAI = -1;
+    for (let i = msgs.length - 1; i >= 0; i--) {
+        if (msgs[i].role === "assistant") { lastAI = i; break; }
+    }
+    if (lastAI === -1) { alert("没有可重新生成的消息"); return; }
+    const assistantMsg = msgs[lastAI];
+
+    // 把当前内容保存为历史版本（如果还没有）
+    if (!assistantMsg.versions) assistantMsg.versions = [assistantMsg.content];
+    // 如果当前内容不是最后一个版本，先截断到当前版本
+    assistantMsg.versions = assistantMsg.versions.slice(0, assistantMsg.versionIndex + 1);
+    // 确保当前内容在版本数组里
+    if (assistantMsg.versions[assistantMsg.versions.length - 1] !== assistantMsg.content) {
+        assistantMsg.versions.push(assistantMsg.content);
+    }
+
+    // 截断到该 AI 消息之前，重新生成
+    const truncated = msgs.slice(0, lastAI);
+    saveCurrentMessages(truncated);
+    await regenerateAfterEdit(truncated);
 }
 
 function showMessageHistory(idx,currentContent,versions){
@@ -500,11 +542,11 @@ if(!res.ok){balanceDisplay.innerText=`查询失败 (HTTP ${res.status})`;return;
 const data=await res.json();
 if(p==="deepseek"){
 const b=data.balance_infos?.[0];
-balanceDisplay.innerText=b?`${b.total_balance} ${b.currency}`:"未知";
+balanceDisplay.innerText=b?`${Number(b.total_balance).toFixed(2)} ${b.currency}`:"未知";
 }else if(p==="openrouter"){
-balanceDisplay.innerText=data.data?`$${data.data.total_credits}`:"未知";
+balanceDisplay.innerText=data.data?`$${Number(data.data.total_credits).toFixed(2)}`:"未知";
 }else if(p==="siliconflow"){
-balanceDisplay.innerText=data.data?`¥${data.data.balance}`:"未知";
+balanceDisplay.innerText=data.data?`¥${Number(data.data.balance).toFixed(2)}`:"未知";
 }
 }catch(e){balanceDisplay.innerText="查询失败";}
 }
