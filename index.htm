@@ -3,30 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>DeepSeek · 最新模型 + 版本历史修复</title>
+    <title>261014</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { background: #e9eef4; font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 0; }
         .app { max-width: 100%; width: 100%; background: white; display: flex; flex-direction: column; height: 100vh; }
-        .top-bar { background: #ffffffdd; backdrop-filter: blur(12px); padding: 12px 16px; border-bottom: 1px solid #eef2f0; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; justify-content: space-between; }
-        .conv-control { display: flex; align-items: center; gap: 8px; background: #f0f2f5; border-radius: 40px; padding: 4px 12px; flex-wrap: wrap; }
-        .conv-name { font-weight: 600; font-size: 0.9rem; color: #1f5e6e; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
-        .icon-btn { background: transparent; border: none; font-size: 1.2rem; cursor: pointer; padding: 6px; border-radius: 30px; width: 32px; height: 32px; }
+        .top-bar { background: #ffffffdd; backdrop-filter: blur(12px); padding: 10px 14px; border-bottom: 1px solid #eef2f0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: space-between; }
+        .conv-control { display: flex; align-items: center; gap: 6px; background: #f0f2f5; border-radius: 40px; padding: 4px 10px; flex-wrap: wrap; }
+        .conv-name { font-weight: 600; font-size: 0.85rem; color: #1f5e6e; max-width: 130px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+        .icon-btn { background: transparent; border: none; font-size: 1.1rem; cursor: pointer; padding: 4px; border-radius: 30px; width: 30px; height: 30px; }
         .icon-btn:active { background: #e0e4ea; }
-        .api-section { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-        .api-input { background: #f0f2f5; border: 1px solid #dce3ec; border-radius: 40px; padding: 6px 12px; font-size: 0.7rem; width: 140px; font-family: monospace; }
-        .small-btn { background: #eef2f7; border: none; border-radius: 30px; padding: 5px 12px; font-size: 0.7rem; cursor: pointer; }
-        .model-select { background: #eef2f7; border: none; border-radius: 30px; padding: 5px 12px; font-size: 0.7rem; cursor: pointer; }
+        .api-section { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+        .api-input { background: #f0f2f5; border: 1px solid #dce3ec; border-radius: 40px; padding: 5px 10px; font-size: 0.65rem; width: 110px; font-family: monospace; }
+        .small-btn { background: #eef2f7; border: none; border-radius: 30px; padding: 4px 10px; font-size: 0.65rem; cursor: pointer; }
+        .select-sm { background: #eef2f7; border: none; border-radius: 30px; padding: 4px 8px; font-size: 0.65rem; cursor: pointer; max-width: 120px; }
         .messages-container { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; background: #fefefe; }
         .message { display: flex; flex-direction: column; max-width: 85%; position: relative; }
         .user-message { align-self: flex-end; }
         .assistant-message { align-self: flex-start; }
         .bubble { padding: 10px 14px; border-radius: 22px; line-height: 1.45; font-size: 0.9rem; word-wrap: break-word; white-space: pre-wrap; }
         .user-message .bubble { background: #1f7e8c; color: white; border-bottom-right-radius: 6px; }
-        .assistant-message .bubble { background: #eef2fa; color: #1a2c3e; border-bottom-left-radius: 6px; }
-        .message-actions { display: flex; gap: 12px; margin-top: 4px; margin-left: 12px; font-size: 0.65rem; flex-wrap: wrap; }
-        .action-btn { background: transparent; border: none; color: #6c7a91; cursor: pointer; padding: 4px 6px; border-radius: 20px; display: inline-flex; align-items: center; gap: 4px; }
+        .assistant-message .bubble { background: #eef2fa; border-bottom-left-radius: 6px; }
+        .message-actions { display: flex; gap: 10px; margin-top: 4px; margin-left: 12px; font-size: 0.6rem; flex-wrap: wrap; align-items: center; }
+        .action-btn { background: transparent; border: none; color: #6c7a91; cursor: pointer; padding: 3px 5px; border-radius: 20px; display: inline-flex; align-items: center; gap: 3px; }
         .action-btn:active { background: #e2e8f0; }
+        .version-nav { display: inline-flex; align-items: center; gap: 4px; background: #f0f2f5; border-radius: 20px; padding: 1px 6px; }
+        .version-nav button { background: transparent; border: none; cursor: pointer; font-size: 0.65rem; padding: 2px 4px; }
+        .version-label { font-size: 0.6rem; color: #5f6c80; min-width: 30px; text-align: center; }
         .message-time { font-size: 0.55rem; color: #8d9aae; margin-top: 4px; margin-left: 12px; }
         .loading-bubble { background: #eef2fa; padding: 10px 16px; border-radius: 24px; display: flex; gap: 6px; width: fit-content; }
         .dot { width: 8px; height: 8px; background: #8f9bb3; border-radius: 50%; animation: wave 1.2s infinite; }
@@ -36,60 +39,24 @@
         textarea { width: 100%; border: none; background: transparent; resize: none; font-size: 0.9rem; font-family: inherit; outline: none; max-height: 100px; }
         .send-btn { background: #1f7e8c; border: none; width: 44px; height: 44px; border-radius: 44px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; font-size: 1.2rem; }
         .send-btn.disabled { opacity: 0.5; pointer-events: none; }
-        .edit-modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            justify-content: center;
-            align-items: center;
-            z-index: 2000;
-        }
-        .edit-modal-content {
-            background: white;
-            width: 85%;
-            max-width: 400px;
-            border-radius: 28px;
-            padding: 20px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-        }
-        .edit-modal-content textarea {
-            width: 100%;
-            border: 1px solid #ccc;
-            border-radius: 16px;
-            padding: 12px;
-            font-size: 0.9rem;
-            font-family: inherit;
-            margin: 12px 0;
-            resize: vertical;
-        }
-        .edit-modal-buttons {
-            display: flex;
-            justify-content: flex-end;
-            gap: 12px;
-        }
-        .edit-modal-buttons button {
-            padding: 8px 16px;
-            border-radius: 40px;
-            border: none;
-            background: #eef2f7;
-            font-size: 0.8rem;
-            cursor: pointer;
-        }
+        .edit-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 2000; }
+        .edit-modal-content { background: white; width: 85%; max-width: 400px; border-radius: 28px; padding: 20px; }
+        .edit-modal-content textarea { width: 100%; border: 1px solid #ccc; border-radius: 16px; padding: 12px; font-size: 0.9rem; margin: 12px 0; resize: vertical; }
+        .edit-modal-buttons { display: flex; justify-content: flex-end; gap: 12px; }
+        .edit-modal-buttons button { padding: 8px 16px; border-radius: 40px; border: none; background: #eef2f7; font-size: 0.8rem; cursor: pointer; }
         .edit-modal-buttons button:first-child { background: #1f7e8c; color: white; }
-        .modal, .version-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content, .version-modal-content { background: white; width: 85%; max-width: 320px; border-radius: 28px; padding: 20px; max-height: 70%; overflow-y: auto; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; width: 85%; max-width: 320px; border-radius: 28px; padding: 20px; max-height: 70%; overflow-y: auto; }
         .modal-header { font-weight: 600; margin-bottom: 12px; display: flex; justify-content: space-between; }
         .conv-list, .version-list { list-style: none; }
-        .conv-list li, .version-list li { padding: 12px 8px; border-bottom: 1px solid #eef2f0; display: flex; justify-content: space-between; align-items: center; }
-        .conv-title, .version-title { cursor: pointer; flex: 1; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .del-conv { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #c23d3d; padding: 0 8px; }
-        .new-conv-btn { background: #1f7e8c; color: white; border: none; border-radius: 40px; padding: 8px; width: 100%; margin-top: 12px; font-size: 0.9rem; cursor: pointer; }
-        .footer-note { font-size: 0.6rem; text-align: center; padding: 8px; color: #95a5bc; background: #ffffffcc; }
-        @media (max-width: 550px) { .api-input { width: 110px; } .conv-name { max-width: 120px; } }
+        .conv-list li, .version-list li { padding: 10px 6px; border-bottom: 1px solid #eef2f0; display: flex; justify-content: space-between; align-items: center; }
+        .conv-title, .version-title { cursor: pointer; flex: 1; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .del-conv { background: none; border: none; font-size: 1.1rem; cursor: pointer; color: #c23d3d; padding: 0 6px; }
+        .new-conv-btn { background: #1f7e8c; color: white; border: none; border-radius: 40px; padding: 8px; width: 100%; margin-top: 12px; font-size: 0.85rem; cursor: pointer; }
+        .footer-note { font-size: 0.55rem; text-align: center; padding: 6px; color: #95a5bc; background: #ffffffcc; }
+        .color-dot { width: 18px; height: 18px; border-radius: 50%; display: inline-block; cursor: pointer; border: 2px solid transparent; }
+        .color-dot.active { border-color: #1f7e8c; }
+        @media (max-width: 550px) { .api-input { width: 90px; } .conv-name { max-width: 100px; } }
     </style>
 </head>
 <body>
@@ -99,23 +66,34 @@
             <button id="showConvListBtn" class="icon-btn">📋</button>
             <span id="currentConvName" class="conv-name">对话</span>
             <button id="newConvBtn" class="icon-btn">➕</button>
-            <button id="keepTwoRoundsBtn" class="small-btn" style="background:#ffd966;">✂️ 保留最近2轮并清除历史</button>
-            <button id="exportBackupBtn" class="small-btn">💾 备份</button>
-            <button id="importBackupBtn" class="small-btn">📂 恢复</button>
+            <button id="keepTwoRoundsBtn" class="small-btn" style="background:#ffd966;">✂️ 精简2轮</button>
+            <button id="exportBackupBtn" class="small-btn">💾</button>
+            <button id="importBackupBtn" class="small-btn">📂</button>
         </div>
         <div class="api-section">
-            <input type="password" id="apiKeyInput" class="api-input" placeholder="API Key" autocomplete="off">
-            <button id="saveApiBtn" class="small-btn">保存</button>
-            <select id="modelSelect" class="model-select">
-                <option value="deepseek-v4-flash">V4-Flash (快速)</option>
-                <option value="deepseek-v4-pro">V4-Pro (增强)</option>
-                <option value="deepseek-reasoner">R1 (深度思考)</option>
+            <select id="providerSelect" class="select-sm">
+                <option value="openrouter">OpenRouter</option>
+                <option value="deepseek">DeepSeek官方</option>
+                <option value="siliconflow">硅基流动</option>
+                <option value="groq">Groq</option>
+                <option value="custom">自定义</option>
             </select>
+            <input type="text" id="baseUrlInput" class="api-input" placeholder="Base URL" value="https://openrouter.ai/api/v1">
+            <input type="password" id="apiKeyInput" class="api-input" placeholder="API Key">
+            <button id="saveApiBtn" class="small-btn">保存</button>
+        </div>
+    </div>
+    <div class="top-bar" style="padding-top:6px; padding-bottom:6px;">
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <input type="text" id="modelSearch" class="api-input" placeholder="搜索模型..." style="width:130px;">
+            <select id="modelSelect" class="select-sm" style="max-width:200px;"></select>
+            <span style="font-size:0.6rem; color:#6c7a91;">文字颜色:</span>
+            <span id="colorPicker" style="display:flex; gap:6px;"></span>
         </div>
     </div>
     <div class="messages-container" id="messagesContainer">
         <div class="message assistant-message">
-            <div class="bubble">✨ 加载中...</div>
+            <div class="bubble" style="color:#1a2c3e;">✨ 加载中...</div>
         </div>
     </div>
     <div class="input-area">
@@ -124,13 +102,12 @@
         </div>
         <button id="sendButton" class="send-btn">➤</button>
     </div>
-    <div class="footer-note">🔒 可选择 V4-Flash / V4-Pro / R1，历史版本功能已修复</div>
+    <div class="footer-note">🔒 数据仅存本地 | 支持多供应商 | 消息版本切换 | 编辑预填</div>
 </div>
 
-<!-- 自定义编辑模态框 -->
 <div id="editModal" class="edit-modal">
     <div class="edit-modal-content">
-        <div style="font-weight:600; margin-bottom:8px;">编辑消息</div>
+        <div style="font-weight:600;">编辑消息</div>
         <textarea id="editTextarea" rows="4"></textarea>
         <div class="edit-modal-buttons">
             <button id="editConfirmBtn">确定</button>
@@ -144,23 +121,39 @@
 
 <script>
 (function(){
-    // ---------- 配置 ----------
-    const DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions";
+    // ==================== 配置 ====================
+    const PROVIDERS = {
+        openrouter: { url: "https://openrouter.ai/api/v1", modelsUrl: "https://openrouter.ai/api/v1/models" },
+        deepseek:   { url: "https://api.deepseek.com", modelsUrl: "https://api.deepseek.com/v1/models" },
+        siliconflow:{ url: "https://api.siliconflow.cn/v1", modelsUrl: "https://api.siliconflow.cn/v1/models" },
+        groq:       { url: "https://api.groq.com/openai/v1", modelsUrl: "https://api.groq.com/openai/v1/models" },
+        custom:     { url: "", modelsUrl: "" }
+    };
+
     const SYSTEM_MESSAGE = { role: "system", content: "你是DeepSeek助手，扮演角色进行对话，保持一致性，使用中文。" };
-    
+
+    // 状态
     let conversations = [];
     let activeConvId = null;
     let currentApiKey = "";
-    let currentModel = "deepseek-v4-flash";  // 默认快速版
+    let currentBaseUrl = "https://openrouter.ai/api/v1";
+    let currentModel = "";
+    let currentProvider = "openrouter";
     let isLoading = false;
+    let allModels = [];
+    let textColor = "#1a2c3e"; // 默认文字颜色
 
-    // DOM 元素
+    // DOM
     const msgContainer = document.getElementById("messagesContainer");
     const userInput = document.getElementById("userInput");
     const sendBtn = document.getElementById("sendButton");
-    const apiInput = document.getElementById("apiKeyInput");
+    const apiKeyInput = document.getElementById("apiKeyInput");
+    const baseUrlInput = document.getElementById("baseUrlInput");
+    const providerSelect = document.getElementById("providerSelect");
     const saveApiBtn = document.getElementById("saveApiBtn");
     const modelSelect = document.getElementById("modelSelect");
+    const modelSearch = document.getElementById("modelSearch");
+    const colorPicker = document.getElementById("colorPicker");
     const convNameSpan = document.getElementById("currentConvName");
     const showConvListBtn = document.getElementById("showConvListBtn");
     const newConvBtn = document.getElementById("newConvBtn");
@@ -179,68 +172,77 @@
     const editConfirmBtn = document.getElementById("editConfirmBtn");
     const editCancelBtn = document.getElementById("editCancelBtn");
 
-    // ---------- 存储核心 ----------
+    // ==================== 存储 ====================
     function saveAll() {
-        try {
-            localStorage.setItem("ds_conversations", JSON.stringify(conversations));
-            localStorage.setItem("ds_activeConvId", activeConvId);
-        } catch(e) { console.warn(e); }
+        localStorage.setItem("ds_conversations", JSON.stringify(conversations));
+        localStorage.setItem("ds_activeConvId", activeConvId);
+        localStorage.setItem("ds_provider", currentProvider);
+        localStorage.setItem("ds_baseUrl", currentBaseUrl);
+        localStorage.setItem("ds_apiKey", currentApiKey);
+        localStorage.setItem("ds_model", currentModel);
+        localStorage.setItem("ds_textColor", textColor);
     }
 
-    function normalizeConversation(conv) {
+    function normalizeConv(conv) {
         if (!conv.messages) conv.messages = [];
-        for (let msg of conv.messages) {
-            if (!msg.history) msg.history = [];
-        }
+        // 为每条消息添加 versions 字段（兼容旧数据）
+        conv.messages.forEach(msg => {
+            if (!msg.versions) msg.versions = [msg.content];
+            if (msg.versionIndex === undefined) msg.versionIndex = 0;
+        });
         if (!conv.title) conv.title = "对话";
         return conv;
     }
 
     function loadAllData() {
-        let loaded = false;
         const saved = localStorage.getItem("ds_conversations");
         if (saved) {
             try {
                 let parsed = JSON.parse(saved);
                 if (Array.isArray(parsed) && parsed.length) {
-                    conversations = parsed.map(c => normalizeConversation(c));
-                    loaded = true;
+                    conversations = parsed.map(c => normalizeConv(c));
                 }
-            } catch(e) {}
+            } catch(e) { conversations = []; }
         }
-        if (!loaded) {
+        if (!conversations.length) {
             conversations = [{
                 id: Date.now(),
                 title: "新对话",
-                messages: [{ role: "assistant", content: "✨ 欢迎！您可以在顶部下拉框选择 V4-Flash / V4-Pro / R1 模型。", history: [] }]
+                messages: [{ role: "assistant", content: "✨ 欢迎！点击顶部选择供应商和模型，输入 API Key 后保存。", versions: ["✨ 欢迎！点击顶部选择供应商和模型，输入 API Key 后保存。"], versionIndex: 0 }]
             }];
         }
+        // 恢复其他设置
+        currentProvider = localStorage.getItem("ds_provider") || "openrouter";
+        currentBaseUrl = localStorage.getItem("ds_baseUrl") || PROVIDERS[currentProvider]?.url || "https://openrouter.ai/api/v1";
+        currentApiKey = localStorage.getItem("ds_apiKey") || "";
+        currentModel = localStorage.getItem("ds_model") || "";
+        textColor = localStorage.getItem("ds_textColor") || "#1a2c3e";
+
+        providerSelect.value = currentProvider;
+        baseUrlInput.value = currentBaseUrl;
+        apiKeyInput.value = currentApiKey;
+
         const savedActive = localStorage.getItem("ds_activeConvId");
         if (savedActive && conversations.some(c => c.id == savedActive)) {
             activeConvId = parseInt(savedActive);
         } else {
             activeConvId = conversations[0].id;
         }
-        const curr = conversations.find(c => c.id === activeConvId);
-        if (curr && (!curr.messages || curr.messages.length === 0)) {
-            curr.messages = [{ role: "assistant", content: "✨ 欢迎！您可以在顶部下拉框选择 V4-Flash / V4-Pro / R1 模型。", history: [] }];
-        }
         saveAll();
         renderMessages();
         updateTitle();
     }
 
+    // ==================== 核心对话 ====================
     function getCurrentConv() { return conversations.find(c => c.id === activeConvId); }
-    function getCurrentMessages() { const conv = getCurrentConv(); return conv ? conv.messages : []; }
+    function getCurrentMessages() { const c = getCurrentConv(); return c ? c.messages : []; }
     function saveCurrentMessages(messages) {
         const conv = getCurrentConv();
         if (conv) {
             conv.messages = messages;
             const firstUser = messages.find(m => m.role === "user");
             if (firstUser && (conv.title === "新对话" || !conv.title)) {
-                let newTitle = firstUser.content.slice(0, 20);
-                if (newTitle.length < 1) newTitle = "对话";
-                conv.title = newTitle;
+                conv.title = firstUser.content.slice(0, 20) || "对话";
             }
             saveAll();
             renderMessages();
@@ -248,52 +250,11 @@
         }
     }
 
-    // 保存历史版本：将旧内容存入消息的 history 数组
-    function saveHistoryVersion(msg, oldContent) {
-        if (!msg.history) msg.history = [];
-        // 避免重复保存相同内容（连续调用时）
-        if (msg.history.length === 0 || msg.history[msg.history.length-1] !== oldContent) {
-            msg.history.push(oldContent);
-            if (msg.history.length > 20) msg.history.shift(); // 最多保留20个版本
-        }
-    }
-
-    function showEditModal(idx, originalContent) {
-        editTextarea.value = originalContent;
-        editModal.style.display = "flex";
-        window._pendingEditIdx = idx;
-    }
-
-    function closeEditModal() {
-        editModal.style.display = "none";
-        window._pendingEditIdx = null;
-    }
-
-    async function confirmEdit() {
-        const newContent = editTextarea.value.trim();
-        if (newContent === "") {
-            closeEditModal();
-            return;
-        }
-        const idx = window._pendingEditIdx;
-        closeEditModal();
-        const messages = getCurrentMessages();
-        if (idx === null || idx >= messages.length) return;
-        const msg = messages[idx];
-        // 保存旧版本
-        saveHistoryVersion(msg, msg.content);
-        msg.content = newContent;
-        // 删除该消息之后的所有消息（因为修改了历史）
-        const newMessages = messages.slice(0, idx+1);
-        saveCurrentMessages(newMessages);
-        await regenerateAfterEdit(newMessages);
-    }
-
     function renderMessages() {
         const messages = getCurrentMessages();
         msgContainer.innerHTML = "";
-        if (messages.length === 0) {
-            msgContainer.innerHTML = `<div class="message assistant-message"><div class="bubble">开始对话吧～</div></div>`;
+        if (!messages.length) {
+            msgContainer.innerHTML = `<div class="message assistant-message"><div class="bubble" style="color:${textColor};">开始对话吧～</div></div>`;
             return;
         }
         messages.forEach((msg, idx) => {
@@ -303,9 +264,12 @@
             const bubble = document.createElement("div");
             bubble.className = "bubble";
             bubble.innerText = msg.content;
+            if (!isUser) bubble.style.color = textColor;
             div.appendChild(bubble);
+
             const actions = document.createElement("div");
             actions.className = "message-actions";
+
             // 复制
             const copyBtn = document.createElement("button");
             copyBtn.className = "action-btn";
@@ -317,30 +281,65 @@
                 setTimeout(() => copyBtn.innerHTML = "📋 复制", 1000);
             };
             actions.appendChild(copyBtn);
-            // 历史
+
+            // 版本切换 < 1/3 >
+            if (msg.versions && msg.versions.length > 1) {
+                const versionNav = document.createElement("span");
+                versionNav.className = "version-nav";
+                const prevBtn = document.createElement("button");
+                prevBtn.textContent = "◀";
+                prevBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    if (msg.versionIndex > 0) {
+                        msg.versionIndex--;
+                        msg.content = msg.versions[msg.versionIndex];
+                        saveAll();
+                        renderMessages();
+                    }
+                };
+                const label = document.createElement("span");
+                label.className = "version-label";
+                label.textContent = `${msg.versionIndex + 1}/${msg.versions.length}`;
+                const nextBtn = document.createElement("button");
+                nextBtn.textContent = "▶";
+                nextBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    if (msg.versionIndex < msg.versions.length - 1) {
+                        msg.versionIndex++;
+                        msg.content = msg.versions[msg.versionIndex];
+                        saveAll();
+                        renderMessages();
+                    }
+                };
+                versionNav.appendChild(prevBtn);
+                versionNav.appendChild(label);
+                versionNav.appendChild(nextBtn);
+                actions.appendChild(versionNav);
+            }
+
+            // 历史版本（完整列表）
             const historyBtn = document.createElement("button");
             historyBtn.className = "action-btn";
             historyBtn.innerHTML = "📜 历史";
             historyBtn.onclick = (e) => {
                 e.stopPropagation();
-                showMessageHistory(idx, msg.content, msg.history || []);
+                showMessageHistory(idx, msg.content, msg.versions || []);
             };
             actions.appendChild(historyBtn);
-            // 编辑（仅用户）
+
+            // 编辑（用户消息）
             if (isUser) {
                 const editBtn = document.createElement("button");
                 editBtn.className = "action-btn";
                 editBtn.innerHTML = "✏️ 编辑";
                 editBtn.onclick = (e) => {
                     e.stopPropagation();
-                    const currentMessages = getCurrentMessages();
-                    if (idx < currentMessages.length) {
-                        showEditModal(idx, currentMessages[idx].content);
-                    }
+                    showEditModal(idx, msg.content);
                 };
                 actions.appendChild(editBtn);
             }
-            // 重新生成（仅最后一条AI）
+
+            // 重新生成（最后一条 AI 消息）
             if (!isUser) {
                 const lastAssistantIdx = messages.reduce((last, m, i) => m.role === "assistant" ? i : last, -1);
                 if (idx === lastAssistantIdx) {
@@ -382,21 +381,38 @@
     }
     function hideLoading() { document.getElementById("loadingMsg")?.remove(); }
 
+    // ==================== API 调用 ====================
     async function callAPI(messages) {
         if (!currentApiKey) throw new Error("请先保存 API Key");
+        if (!currentModel) throw new Error("请选择模型");
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 120000);
+        const timeoutId = setTimeout(() => controller.abort(), 180000);
         try {
-            const res = await fetch(DEEPSEEK_API_URL, {
+            const headers = {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${currentApiKey}`
+            };
+            // OpenRouter 建议的 Header（可选）
+            if (currentProvider === "openrouter") {
+                headers["HTTP-Referer"] = location.origin;
+                headers["X-Title"] = "Roleplay Chat";
+            }
+            const res = await fetch(`${currentBaseUrl}/chat/completions`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${currentApiKey}` },
-                body: JSON.stringify({ model: currentModel, messages, temperature: 0.7, max_tokens: 2000, stream: false }),
+                headers,
+                body: JSON.stringify({
+                    model: currentModel,
+                    messages,
+                    temperature: 0.7,
+                    max_tokens: 2000,
+                    stream: false
+                }),
                 signal: controller.signal
             });
             clearTimeout(timeoutId);
             if (!res.ok) {
                 let err = `HTTP ${res.status}`;
-                try { const j = await res.json(); err = j.error?.message || err; } catch(e) {}
+                try { const j = await res.json(); err = j.error?.message || j.message || err; } catch(e) {}
                 throw new Error(err);
             }
             const data = await res.json();
@@ -413,9 +429,10 @@
         const conv = getCurrentConv();
         if (!conv) return;
         const oldMsgs = getCurrentMessages();
-        const newUserMsg = { role: "user", content: text, history: [] };
+        const newUserMsg = { role: "user", content: text, versions: [text], versionIndex: 0 };
         const updated = [...oldMsgs, newUserMsg];
         saveCurrentMessages(updated);
+
         isLoading = true;
         sendBtn.classList.add("disabled");
         showLoading();
@@ -423,21 +440,50 @@
             const apiMessages = updated.map(m => ({ role: m.role, content: m.content }));
             const reply = await callAPI(apiMessages);
             hideLoading();
-            const newAssistantMsg = { role: "assistant", content: reply, history: [] };
+            const newAssistantMsg = { role: "assistant", content: reply, versions: [reply], versionIndex: 0 };
             const final = [...updated, newAssistantMsg];
             saveCurrentMessages(final);
         } catch (err) {
             hideLoading();
             const errMsg = err.message || "调用失败";
-            const errMsgObj = { role: "assistant", content: `⚠️ 错误：${errMsg}`, history: [] };
-            const final = [...updated, errMsgObj];
-            saveCurrentMessages(final);
+            const errObj = { role: "assistant", content: `⚠️ 错误：${errMsg}`, versions: [`⚠️ 错误：${errMsg}`], versionIndex: 0 };
+            saveCurrentMessages([...updated, errObj]);
             if (errMsg.includes("Insufficient Balance")) alert("余额不足");
-            else if (errMsg.includes("API Key")) alert("API Key 无效");
+            else if (errMsg.includes("401") || errMsg.includes("Unauthorized")) alert("API Key 无效");
         } finally {
             isLoading = false;
             sendBtn.classList.remove("disabled");
         }
+    }
+
+    // ==================== 编辑 & 重新生成 ====================
+    function showEditModal(idx, originalContent) {
+        editTextarea.value = originalContent;
+        editModal.style.display = "flex";
+        window._pendingEditIdx = idx;
+    }
+    function closeEditModal() {
+        editModal.style.display = "none";
+        window._pendingEditIdx = null;
+    }
+
+    async function confirmEdit() {
+        const newContent = editTextarea.value.trim();
+        if (newContent === "") { closeEditModal(); return; }
+        const idx = window._pendingEditIdx;
+        closeEditModal();
+        const messages = getCurrentMessages();
+        if (idx === null || idx >= messages.length) return;
+        const msg = messages[idx];
+        // 保存新版本
+        if (!msg.versions) msg.versions = [msg.content];
+        msg.versions.push(newContent);
+        msg.versionIndex = msg.versions.length - 1;
+        msg.content = newContent;
+        // 截断该消息之后的所有消息
+        const newMessages = messages.slice(0, idx+1);
+        saveCurrentMessages(newMessages);
+        await regenerateAfterEdit(newMessages);
     }
 
     async function regenerateAfterEdit(messagesWithoutAssistant) {
@@ -449,15 +495,14 @@
             const apiMessages = messagesWithoutAssistant.map(m => ({ role: m.role, content: m.content }));
             const reply = await callAPI(apiMessages);
             hideLoading();
-            const newAssistant = { role: "assistant", content: reply, history: [] };
+            const newAssistant = { role: "assistant", content: reply, versions: [reply], versionIndex: 0 };
             const final = [...messagesWithoutAssistant, newAssistant];
             saveCurrentMessages(final);
         } catch (err) {
             hideLoading();
             const errMsg = err.message || "调用失败";
-            const errAssistant = { role: "assistant", content: `⚠️ 错误：${errMsg}`, history: [] };
-            const final = [...messagesWithoutAssistant, errAssistant];
-            saveCurrentMessages(final);
+            const errObj = { role: "assistant", content: `⚠️ 错误：${errMsg}`, versions: [`⚠️ 错误：${errMsg}`], versionIndex: 0 };
+            saveCurrentMessages([...messagesWithoutAssistant, errObj]);
         } finally {
             isLoading = false;
             sendBtn.classList.remove("disabled");
@@ -472,90 +517,170 @@
             if (messages[i].role === "assistant") { lastAssistantIdx = i; break; }
         }
         if (lastAssistantIdx === -1) { alert("没有可重新生成的消息"); return; }
-        const assistantMsg = messages[lastAssistantIdx];
-        // 保存历史版本
-        saveHistoryVersion(assistantMsg, assistantMsg.content);
+        // 移除最后一条 AI 消息，重新生成
         const truncated = messages.slice(0, lastAssistantIdx);
         saveCurrentMessages(truncated);
         await regenerateAfterEdit(truncated);
     }
 
-    function showMessageHistory(idx, currentContent, historyArray) {
+    // ==================== 消息历史版本模态框 ====================
+    function showMessageHistory(idx, currentContent, versions) {
         historyListUl.innerHTML = "";
-        const allVersions = [...historyArray, currentContent];
-        if (allVersions.length === 0) {
-            historyListUl.innerHTML = "<li>无历史版本</li>";
-        } else {
-            allVersions.forEach((ver, i) => {
-                const li = document.createElement("li");
-                const span = document.createElement("span");
-                span.className = "version-title";
-                const isCurrent = (i === allVersions.length-1);
-                span.innerText = `版本 ${i+1}${isCurrent ? " (当前)" : ""}`;
-                span.onclick = () => {
-                    if (isCurrent) return;
-                    const messages = getCurrentMessages();
-                    if (idx < messages.length) {
-                        const currentMsg = messages[idx];
-                        // 保存当前版本到历史
-                        saveHistoryVersion(currentMsg, currentMsg.content);
-                        currentMsg.content = ver;
-                        saveCurrentMessages(messages);
-                        msgHistoryModal.style.display = "none";
-                    }
-                };
-                li.appendChild(span);
-                historyListUl.appendChild(li);
-            });
-        }
+        const allVersions = versions.length ? versions : [currentContent];
+        allVersions.forEach((ver, i) => {
+            const li = document.createElement("li");
+            const span = document.createElement("span");
+            span.className = "version-title";
+            const isCurrent = (i === (versions.length - 1));
+            span.innerText = `版本 ${i+1}${isCurrent ? " (当前)" : ""}`;
+            span.onclick = () => {
+                const messages = getCurrentMessages();
+                if (idx < messages.length) {
+                    const msg = messages[idx];
+                    if (!msg.versions) msg.versions = [msg.content];
+                    msg.versionIndex = i;
+                    msg.content = msg.versions[i];
+                    saveAll();
+                    renderMessages();
+                    msgHistoryModal.style.display = "none";
+                }
+            };
+            li.appendChild(span);
+            historyListUl.appendChild(li);
+        });
         msgHistoryModal.style.display = "flex";
     }
 
-    // 保留最近2轮并清除历史
-    function keepLastTwoRoundsAndClearHistory() {
+    // ==================== 精简保留最近2轮 ====================
+    function keepLastTwoRounds() {
         if (isLoading) { alert("请等待当前回复完成"); return; }
         const conv = getCurrentConv();
         if (!conv) return;
         let messages = conv.messages;
         if (messages.length === 0) { alert("没有消息可精简"); return; }
-        
         const systemMsgs = messages.filter(m => m.role === "system");
         const nonSystem = messages.filter(m => m.role !== "system");
-        const keepCount = 4; // 2轮 = 4条消息
-        let keptNonSystem = nonSystem.slice(-keepCount);
-        
-        const newMessages = [...systemMsgs, ...keptNonSystem];
-        const finalMessages = newMessages.map(m => ({
+        const kept = nonSystem.slice(-4); // 保留最后4条（2轮）
+        const newMessages = [...systemMsgs, ...kept].map(m => ({
             role: m.role,
             content: m.content,
-            history: []   // 精简后清空所有历史版本
+            versions: [m.content],
+            versionIndex: 0
         }));
-        
-        conv.messages = finalMessages;
-        conv.versionStack = [JSON.parse(JSON.stringify(finalMessages))];
-        conv.currentVersionIndex = 0;
-        if (!conv.title.includes("(精简2轮)")) {
-            conv.title = conv.title + " (精简2轮)";
-        }
+        conv.messages = newMessages;
+        conv.title = (conv.title || "对话") + " (精简2轮)";
         saveAll();
         renderMessages();
         updateTitle();
-        alert(`已保留最近2轮对话（共${keptNonSystem.length}条消息），并清除了所有历史版本。导出的备份将只包含这些内容。`);
+        alert(`已保留最近2轮对话（共${kept.length}条消息），历史版本已清除。`);
     }
 
-    // 对话管理
+    // ==================== 模型列表拉取 ====================
+    async function loadModelsForProvider(provider, baseUrl) {
+        let models = [];
+        const url = baseUrl ? `${baseUrl}/models` : "";
+        if (!url) { modelSelect.innerHTML = '<option value="">请先填写 Base URL</option>'; return; }
+        try {
+            const headers = {};
+            if (currentApiKey) headers["Authorization"] = `Bearer ${currentApiKey}`;
+            const res = await fetch(url, { headers });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.data && Array.isArray(data.data)) {
+                    models = data.data.map(m => m.id).filter(Boolean);
+                } else if (Array.isArray(data)) {
+                    models = data.map(m => m.id || m.name).filter(Boolean);
+                }
+            }
+        } catch(e) { console.warn("拉取模型失败", e); }
+        // 兜底默认模型
+        if (!models.length) {
+            if (provider === "openrouter") {
+                models = ["deepseek/deepseek-v4-flash", "deepseek/deepseek-v4-pro", "deepseek/deepseek-r1", "openai/gpt-4o", "anthropic/claude-3.5-sonnet"];
+            } else if (provider === "deepseek") {
+                models = ["deepseek-chat", "deepseek-reasoner"];
+            } else if (provider === "siliconflow") {
+                models = ["deepseek-ai/DeepSeek-V3", "deepseek-ai/DeepSeek-R1"];
+            } else if (provider === "groq") {
+                models = ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"];
+            } else {
+                models = ["gpt-3.5-turbo"];
+            }
+        }
+        allModels = models.sort();
+        applyModelFilter();
+    }
+
+    function applyModelFilter() {
+        const keyword = modelSearch.value.trim().toLowerCase();
+        const filtered = keyword ? allModels.filter(m => m.toLowerCase().includes(keyword)) : allModels;
+        modelSelect.innerHTML = "";
+        if (!filtered.length) {
+            const opt = document.createElement("option");
+            opt.value = "";
+            opt.textContent = "无匹配模型";
+            modelSelect.appendChild(opt);
+            return;
+        }
+        filtered.forEach(m => {
+            const opt = document.createElement("option");
+            opt.value = m;
+            opt.textContent = m;
+            if (m === currentModel) opt.selected = true;
+            modelSelect.appendChild(opt);
+        });
+        if (!currentModel && filtered.length) {
+            currentModel = filtered[0];
+            modelSelect.value = currentModel;
+        }
+    }
+
+    // ==================== 供应商切换 ====================
+    function onProviderChange() {
+        const p = providerSelect.value;
+        currentProvider = p;
+        if (p !== "custom" && PROVIDERS[p]) {
+            currentBaseUrl = PROVIDERS[p].url;
+            baseUrlInput.value = currentBaseUrl;
+        }
+        localStorage.setItem("ds_provider", p);
+        localStorage.setItem("ds_baseUrl", currentBaseUrl);
+        loadModelsForProvider(p, currentBaseUrl);
+    }
+
+    // ==================== 颜色选择 ====================
+    function initColorPicker() {
+        const colors = ["#1a2c3e", "#2d4a5e", "#3e5e4a", "#5e3e4a", "#4a3e5e", "#5e4a3e", "#2c3e50"];
+        colors.forEach(c => {
+            const dot = document.createElement("span");
+            dot.className = "color-dot";
+            dot.style.backgroundColor = c;
+            if (c === textColor) dot.classList.add("active");
+            dot.onclick = () => {
+                textColor = c;
+                localStorage.setItem("ds_textColor", c);
+                document.querySelectorAll(".color-dot").forEach(d => d.classList.remove("active"));
+                dot.classList.add("active");
+                renderMessages();
+            };
+            colorPicker.appendChild(dot);
+        });
+    }
+
+    // ==================== 其他交互 ====================
     function switchConversation(id) {
         if (isLoading) { alert("请等待完成"); return; }
         activeConvId = id;
         saveAll();
         updateTitle();
         renderMessages();
+        closeModalPanel();
     }
     function newConversation() {
         if (isLoading) return;
-        const newId = Date.now();
-        conversations.push({ id: newId, title: "新对话", messages: [], versionStack: [], currentVersionIndex: 0 });
-        activeConvId = newId;
+        const id = Date.now();
+        conversations.push({ id, title: "新对话", messages: [] });
+        activeConvId = id;
         saveAll();
         updateTitle();
         renderMessages();
@@ -580,7 +705,7 @@
             const span = document.createElement("span");
             span.className = "conv-title";
             span.innerText = c.title || "对话";
-            span.onclick = () => { switchConversation(c.id); closeModalPanel(); };
+            span.onclick = () => switchConversation(c.id);
             const del = document.createElement("button");
             del.className = "del-conv";
             del.innerText = "🗑️";
@@ -594,12 +719,12 @@
     function closeModalPanel() { convModal.style.display = "none"; }
     function closeHistoryModalPanel() { msgHistoryModal.style.display = "none"; }
 
+    // 备份/恢复
     function exportBackup() {
-        const dataStr = JSON.stringify(conversations);
-        const blob = new Blob([dataStr], {type: "application/json"});
+        const blob = new Blob([JSON.stringify(conversations, null, 2)], {type:"application/json"});
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = `deepseek_backup_${Date.now()}.json`;
+        a.download = `roleplay_backup_${Date.now()}.json`;
         a.click();
         URL.revokeObjectURL(a.href);
         alert("备份已导出");
@@ -616,7 +741,7 @@
                 try {
                     const imported = JSON.parse(ev.target.result);
                     if (Array.isArray(imported) && imported.length) {
-                        conversations = imported.map(c => normalizeConversation(c));
+                        conversations = imported.map(c => normalizeConv(c));
                         saveAll();
                         if (!activeConvId || !conversations.some(c => c.id === activeConvId)) activeConvId = conversations[0].id;
                         renderMessages();
@@ -630,88 +755,16 @@
         input.click();
     }
 
-    // API Key 管理
-    function loadApiKey() {
-        const saved = localStorage.getItem("deepseek_api_key");
-        if (saved) {
-            apiInput.value = saved;
-            currentApiKey = saved;
-        } else {
-            apiInput.value = "";
-            currentApiKey = "";
-        }
-    }
-    function saveApiKey() {
-        const newKey = apiInput.value.trim();
-        if (newKey === "") {
-            if (confirm("清除 API Key？")) {
-                localStorage.removeItem("deepseek_api_key");
-                currentApiKey = "";
-                apiInput.value = "";
-                alert("已清除");
-            }
-        } else {
-            localStorage.setItem("deepseek_api_key", newKey);
-            currentApiKey = newKey;
-            alert("✅ API Key 已保存");
-        }
-    }
-
-    // 模型选择
-    function loadModelPreference() {
-        const savedModel = localStorage.getItem("deepseek_model");
-        if (savedModel && modelSelect.querySelector(`option[value="${savedModel}"]`)) {
-            modelSelect.value = savedModel;
-            currentModel = savedModel;
-        } else {
-            currentModel = modelSelect.value;
-            localStorage.setItem("deepseek_model", currentModel);
-        }
-    }
-    function saveModelPreference() {
-        currentModel = modelSelect.value;
-        localStorage.setItem("deepseek_model", currentModel);
-        let modelName = "";
-        if (currentModel === "deepseek-v4-flash") modelName = "V4-Flash";
-        else if (currentModel === "deepseek-v4-pro") modelName = "V4-Pro";
-        else if (currentModel === "deepseek-reasoner") modelName = "R1";
-        const tip = document.createElement("div");
-        tip.style.position = "fixed"; tip.style.bottom = "70px"; tip.style.left = "20px";
-        tip.style.background = "#1f7e8c"; tip.style.color = "white"; tip.style.padding = "6px 12px";
-        tip.style.borderRadius = "20px"; tip.style.fontSize = "0.7rem"; tip.style.zIndex = "999";
-        tip.innerText = `已切换至 ${modelName} 模型`;
-        document.body.appendChild(tip);
-        setTimeout(() => tip.remove(), 1500);
-    }
-
-    function autoResizeTextarea() {
-        userInput.style.height = 'auto';
-        userInput.style.height = Math.min(100, userInput.scrollHeight) + 'px';
-    }
-
+    // ==================== 初始化 ====================
     function bindEvents() {
-        sendBtn.addEventListener("click", () => {
+        sendBtn.onclick = () => {
             const text = userInput.value.trim();
             if (text && !isLoading) {
                 userInput.value = "";
                 userInput.style.height = "auto";
                 sendMessage(text);
             }
-        });
-        saveApiBtn.addEventListener("click", saveApiKey);
-        newConvBtn.addEventListener("click", newConversation);
-        keepTwoRoundsBtn.addEventListener("click", () => {
-            if (confirm("⚠️ 此操作将删除当前对话中超过最近2轮的所有消息，并清除所有历史版本。建议先点击「💾 备份」。是否继续？")) {
-                keepLastTwoRoundsAndClearHistory();
-            }
-        });
-        showConvListBtn.addEventListener("click", openModalPanel);
-        closeModalBtn.addEventListener("click", closeModalPanel);
-        modalNewConvBtn.addEventListener("click", () => { newConversation(); closeModalPanel(); });
-        exportBackupBtn.addEventListener("click", exportBackup);
-        importBackupBtn.addEventListener("click", importBackup);
-        closeHistoryModalBtn.addEventListener("click", closeHistoryModalPanel);
-        modelSelect.addEventListener("change", saveModelPreference);
+        };
         userInput.addEventListener("keydown", (e) => {
             if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -723,24 +776,56 @@
                 }
             }
         });
-        userInput.addEventListener("input", autoResizeTextarea);
-        window.addEventListener("click", (e) => { if (e.target === convModal) closeModalPanel(); if (e.target === msgHistoryModal) closeHistoryModalPanel(); if (e.target === editModal) closeEditModal(); });
-        editConfirmBtn.addEventListener("click", confirmEdit);
-        editCancelBtn.addEventListener("click", closeEditModal);
+        userInput.addEventListener("input", () => {
+            userInput.style.height = 'auto';
+            userInput.style.height = Math.min(100, userInput.scrollHeight) + 'px';
+        });
+
+        providerSelect.onchange = onProviderChange;
+        baseUrlInput.oninput = () => { currentBaseUrl = baseUrlInput.value.trim(); };
+        apiKeyInput.oninput = () => { currentApiKey = apiKeyInput.value.trim(); };
+        saveApiBtn.onclick = () => {
+            currentBaseUrl = baseUrlInput.value.trim();
+            currentApiKey = apiKeyInput.value.trim();
+            currentModel = modelSelect.value;
+            saveAll();
+            alert("✅ 设置已保存");
+        };
+        modelSearch.oninput = applyModelFilter;
+        modelSelect.onchange = () => { currentModel = modelSelect.value; saveAll(); };
+
+        showConvListBtn.onclick = openModalPanel;
+        closeModalBtn.onclick = closeModalPanel;
+        newConvBtn.onclick = newConversation;
+        modalNewConvBtn.onclick = () => { newConversation(); closeModalPanel(); };
+        keepTwoRoundsBtn.onclick = () => { if(confirm("将保留最近2轮并清除历史版本，确定？")) keepLastTwoRounds(); };
+        exportBackupBtn.onclick = exportBackup;
+        importBackupBtn.onclick = importBackup;
+        closeHistoryModalBtn.onclick = closeHistoryModalPanel;
+        editConfirmBtn.onclick = confirmEdit;
+        editCancelBtn.onclick = closeEditModal;
+        window.addEventListener("click", (e) => {
+            if (e.target === convModal) closeModalPanel();
+            if (e.target === msgHistoryModal) closeHistoryModalPanel();
+            if (e.target === editModal) closeEditModal();
+        });
     }
 
-    function bootstrap() {
-        loadApiKey();
+    async function bootstrap() {
         loadAllData();
-        loadModelPreference();
+        initColorPicker();
         bindEvents();
-        setTimeout(() => {
-            const saved = localStorage.getItem("deepseek_api_key");
-            if (saved && apiInput.value !== saved) {
-                apiInput.value = saved;
-                currentApiKey = saved;
-            }
-        }, 100);
+        // 拉取模型列表
+        await loadModelsForProvider(currentProvider, currentBaseUrl);
+        // 如果之前保存的模型还在列表中，则选中
+        if (currentModel && allModels.includes(currentModel)) {
+            modelSelect.value = currentModel;
+        } else if (allModels.length) {
+            currentModel = allModels[0];
+            modelSelect.value = currentModel;
+        }
+        renderMessages();
+        updateTitle();
     }
     bootstrap();
 })();
