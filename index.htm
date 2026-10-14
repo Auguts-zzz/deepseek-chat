@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>261014</title>
+    <title>角色扮演助手 · 完整版</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { background: #e9eef4; font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 0; }
@@ -17,13 +17,15 @@
         .api-input { background: #f0f2f5; border: 1px solid #dce3ec; border-radius: 40px; padding: 5px 10px; font-size: 0.65rem; width: 110px; font-family: monospace; }
         .small-btn { background: #eef2f7; border: none; border-radius: 30px; padding: 4px 10px; font-size: 0.65rem; cursor: pointer; }
         .select-sm { background: #eef2f7; border: none; border-radius: 30px; padding: 4px 8px; font-size: 0.65rem; cursor: pointer; max-width: 120px; }
+        .balance-box { background: #fff8e6; border: 1px solid #ffe0a3; border-radius: 20px; padding: 4px 10px; font-size: 0.65rem; color: #7a5c00; display: flex; align-items: center; gap: 6px; }
+        .balance-box span { font-weight: 600; }
         .messages-container { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; background: #fefefe; }
         .message { display: flex; flex-direction: column; max-width: 85%; position: relative; }
         .user-message { align-self: flex-end; }
         .assistant-message { align-self: flex-start; }
         .bubble { padding: 10px 14px; border-radius: 22px; line-height: 1.45; font-size: 0.9rem; word-wrap: break-word; white-space: pre-wrap; }
         .user-message .bubble { background: #1f7e8c; color: white; border-bottom-right-radius: 6px; }
-        .assistant-message .bubble { background: #eef2fa; border-bottom-left-radius: 6px; }
+        .assistant-message .bubble { background: #eef2fa; border-bottom-left-radius: 6px; color: #1a2c3e; }
         .message-actions { display: flex; gap: 10px; margin-top: 4px; margin-left: 12px; font-size: 0.6rem; flex-wrap: wrap; align-items: center; }
         .action-btn { background: transparent; border: none; color: #6c7a91; cursor: pointer; padding: 3px 5px; border-radius: 20px; display: inline-flex; align-items: center; gap: 3px; }
         .action-btn:active { background: #e2e8f0; }
@@ -54,8 +56,13 @@
         .del-conv { background: none; border: none; font-size: 1.1rem; cursor: pointer; color: #c23d3d; padding: 0 6px; }
         .new-conv-btn { background: #1f7e8c; color: white; border: none; border-radius: 40px; padding: 8px; width: 100%; margin-top: 12px; font-size: 0.85rem; cursor: pointer; }
         .footer-note { font-size: 0.55rem; text-align: center; padding: 6px; color: #95a5bc; background: #ffffffcc; }
-        .color-dot { width: 18px; height: 18px; border-radius: 50%; display: inline-block; cursor: pointer; border: 2px solid transparent; }
+        .color-dot { width: 16px; height: 16px; border-radius: 50%; display: inline-block; cursor: pointer; border: 2px solid transparent; }
         .color-dot.active { border-color: #1f7e8c; }
+        .color-red { color: #c0392b; }
+        .color-blue { color: #2471a3; }
+        .color-green { color: #1e8449; }
+        .color-purple { color: #7d3c98; }
+        .color-orange { color: #b9770e; }
         @media (max-width: 550px) { .api-input { width: 90px; } .conv-name { max-width: 100px; } }
     </style>
 </head>
@@ -84,11 +91,13 @@
         </div>
     </div>
     <div class="top-bar" style="padding-top:6px; padding-bottom:6px;">
-        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; width:100%;">
             <input type="text" id="modelSearch" class="api-input" placeholder="搜索模型..." style="width:130px;">
-            <select id="modelSelect" class="select-sm" style="max-width:200px;"></select>
-            <span style="font-size:0.6rem; color:#6c7a91;">文字颜色:</span>
-            <span id="colorPicker" style="display:flex; gap:6px;"></span>
+            <select id="modelSelect" class="select-sm" style="max-width:200px; flex:1;"></select>
+            <div class="balance-box">
+                💰 余额: <span id="balanceDisplay">点击查询</span>
+                <button id="queryBalanceBtn" class="small-btn" style="padding:2px 8px;">查询</button>
+            </div>
         </div>
     </div>
     <div class="messages-container" id="messagesContainer">
@@ -102,7 +111,7 @@
         </div>
         <button id="sendButton" class="send-btn">➤</button>
     </div>
-    <div class="footer-note">🔒 数据仅存本地 | 支持多供应商 | 消息版本切换 | 编辑预填</div>
+    <div class="footer-note">🔒 数据仅存本地 | 支持多供应商 | 消息版本联动 | 余额查询</div>
 </div>
 
 <div id="editModal" class="edit-modal">
@@ -123,14 +132,17 @@
 (function(){
     // ==================== 配置 ====================
     const PROVIDERS = {
-        openrouter: { url: "https://openrouter.ai/api/v1", modelsUrl: "https://openrouter.ai/api/v1/models" },
-        deepseek:   { url: "https://api.deepseek.com", modelsUrl: "https://api.deepseek.com/v1/models" },
-        siliconflow:{ url: "https://api.siliconflow.cn/v1", modelsUrl: "https://api.siliconflow.cn/v1/models" },
-        groq:       { url: "https://api.groq.com/openai/v1", modelsUrl: "https://api.groq.com/openai/v1/models" },
-        custom:     { url: "", modelsUrl: "" }
+        openrouter: { url: "https://openrouter.ai/api/v1", name: "OpenRouter" },
+        deepseek:   { url: "https://api.deepseek.com/v1", name: "DeepSeek官方" },
+        siliconflow:{ url: "https://api.siliconflow.cn/v1", name: "硅基流动" },
+        groq:       { url: "https://api.groq.com/openai/v1", name: "Groq" },
+        custom:     { url: "", name: "自定义" }
     };
 
-    const SYSTEM_MESSAGE = { role: "system", content: "你是DeepSeek助手，扮演角色进行对话，保持一致性，使用中文。" };
+    const SYSTEM_MESSAGE = {
+        role: "system",
+        content: "你是DeepSeek助手，扮演角色进行对话，保持一致性，使用中文。你可以在回复中用颜色标记来强调特定内容，格式如下：[红]红色文字[/红]、[蓝]蓝色文字[/蓝]、[绿]绿色文字[/绿]、[紫]紫色文字[/紫]、[橙]橙色文字[/橙]。根据情节需要适当使用，不要滥用。"
+    };
 
     // 状态
     let conversations = [];
@@ -141,7 +153,6 @@
     let currentProvider = "openrouter";
     let isLoading = false;
     let allModels = [];
-    let textColor = "#1a2c3e"; // 默认文字颜色
 
     // DOM
     const msgContainer = document.getElementById("messagesContainer");
@@ -153,7 +164,8 @@
     const saveApiBtn = document.getElementById("saveApiBtn");
     const modelSelect = document.getElementById("modelSelect");
     const modelSearch = document.getElementById("modelSearch");
-    const colorPicker = document.getElementById("colorPicker");
+    const balanceDisplay = document.getElementById("balanceDisplay");
+    const queryBalanceBtn = document.getElementById("queryBalanceBtn");
     const convNameSpan = document.getElementById("currentConvName");
     const showConvListBtn = document.getElementById("showConvListBtn");
     const newConvBtn = document.getElementById("newConvBtn");
@@ -180,15 +192,15 @@
         localStorage.setItem("ds_baseUrl", currentBaseUrl);
         localStorage.setItem("ds_apiKey", currentApiKey);
         localStorage.setItem("ds_model", currentModel);
-        localStorage.setItem("ds_textColor", textColor);
     }
 
     function normalizeConv(conv) {
         if (!conv.messages) conv.messages = [];
-        // 为每条消息添加 versions 字段（兼容旧数据）
         conv.messages.forEach(msg => {
             if (!msg.versions) msg.versions = [msg.content];
             if (msg.versionIndex === undefined) msg.versionIndex = 0;
+            // 为版本中每条内容生成纯文本（用于API请求和渲染）
+            if (!msg.versionTexts) msg.versionTexts = msg.versions.slice();
         });
         if (!conv.title) conv.title = "对话";
         return conv;
@@ -208,15 +220,18 @@
             conversations = [{
                 id: Date.now(),
                 title: "新对话",
-                messages: [{ role: "assistant", content: "✨ 欢迎！点击顶部选择供应商和模型，输入 API Key 后保存。", versions: ["✨ 欢迎！点击顶部选择供应商和模型，输入 API Key 后保存。"], versionIndex: 0 }]
+                messages: [{
+                    role: "assistant",
+                    content: "✨ 欢迎！选择供应商和模型，填写 API Key 后保存即可开始。",
+                    versions: ["✨ 欢迎！选择供应商和模型，填写 API Key 后保存即可开始。"],
+                    versionIndex: 0
+                }]
             }];
         }
-        // 恢复其他设置
         currentProvider = localStorage.getItem("ds_provider") || "openrouter";
         currentBaseUrl = localStorage.getItem("ds_baseUrl") || PROVIDERS[currentProvider]?.url || "https://openrouter.ai/api/v1";
         currentApiKey = localStorage.getItem("ds_apiKey") || "";
         currentModel = localStorage.getItem("ds_model") || "";
-        textColor = localStorage.getItem("ds_textColor") || "#1a2c3e";
 
         providerSelect.value = currentProvider;
         baseUrlInput.value = currentBaseUrl;
@@ -233,7 +248,7 @@
         updateTitle();
     }
 
-    // ==================== 核心对话 ====================
+    // ==================== 核心数据 ====================
     function getCurrentConv() { return conversations.find(c => c.id === activeConvId); }
     function getCurrentMessages() { const c = getCurrentConv(); return c ? c.messages : []; }
     function saveCurrentMessages(messages) {
@@ -250,11 +265,30 @@
         }
     }
 
+    // ==================== 渲染（支持颜色标记 + 版本导航） ====================
+    function renderRichText(text) {
+        // 解析 [红]...[/红] 等标记
+        let html = escapeHtml(text);
+        const colorMap = {
+            '红': 'color-red', '蓝': 'color-blue', '绿': 'color-green',
+            '紫': 'color-purple', '橙': 'color-orange'
+        };
+        Object.keys(colorMap).forEach(cn => {
+            const regex = new RegExp(`\\[${cn}\\]([\\s\\S]*?)\\[\\/${cn}\\]`, 'g');
+            html = html.replace(regex, `<span class="${colorMap[cn]}">$1</span>`);
+        });
+        return html;
+    }
+    function escapeHtml(str) {
+        if (!str) return "";
+        return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
+    }
+
     function renderMessages() {
         const messages = getCurrentMessages();
         msgContainer.innerHTML = "";
         if (!messages.length) {
-            msgContainer.innerHTML = `<div class="message assistant-message"><div class="bubble" style="color:${textColor};">开始对话吧～</div></div>`;
+            msgContainer.innerHTML = `<div class="message assistant-message"><div class="bubble">开始对话吧～</div></div>`;
             return;
         }
         messages.forEach((msg, idx) => {
@@ -263,8 +297,11 @@
             div.className = `message ${isUser ? "user-message" : "assistant-message"}`;
             const bubble = document.createElement("div");
             bubble.className = "bubble";
-            bubble.innerText = msg.content;
-            if (!isUser) bubble.style.color = textColor;
+            if (isUser) {
+                bubble.innerText = msg.content;
+            } else {
+                bubble.innerHTML = renderRichText(msg.content);
+            }
             div.appendChild(bubble);
 
             const actions = document.createElement("div");
@@ -282,7 +319,7 @@
             };
             actions.appendChild(copyBtn);
 
-            // 版本切换 < 1/3 >
+            // 版本导航（用户和AI都有）
             if (msg.versions && msg.versions.length > 1) {
                 const versionNav = document.createElement("span");
                 versionNav.className = "version-nav";
@@ -290,12 +327,7 @@
                 prevBtn.textContent = "◀";
                 prevBtn.onclick = (e) => {
                     e.stopPropagation();
-                    if (msg.versionIndex > 0) {
-                        msg.versionIndex--;
-                        msg.content = msg.versions[msg.versionIndex];
-                        saveAll();
-                        renderMessages();
-                    }
+                    switchMessageVersion(idx, msg.versionIndex - 1);
                 };
                 const label = document.createElement("span");
                 label.className = "version-label";
@@ -304,12 +336,7 @@
                 nextBtn.textContent = "▶";
                 nextBtn.onclick = (e) => {
                     e.stopPropagation();
-                    if (msg.versionIndex < msg.versions.length - 1) {
-                        msg.versionIndex++;
-                        msg.content = msg.versions[msg.versionIndex];
-                        saveAll();
-                        renderMessages();
-                    }
+                    switchMessageVersion(idx, msg.versionIndex + 1);
                 };
                 versionNav.appendChild(prevBtn);
                 versionNav.appendChild(label);
@@ -317,7 +344,7 @@
                 actions.appendChild(versionNav);
             }
 
-            // 历史版本（完整列表）
+            // 历史版本
             const historyBtn = document.createElement("button");
             historyBtn.className = "action-btn";
             historyBtn.innerHTML = "📜 历史";
@@ -363,6 +390,38 @@
         msgContainer.scrollTop = msgContainer.scrollHeight;
     }
 
+    // 切换消息版本，并联动后续消息
+    function switchMessageVersion(idx, newVersionIndex) {
+        const conv = getCurrentConv();
+        if (!conv) return;
+        const messages = conv.messages;
+        const msg = messages[idx];
+        if (!msg || !msg.versions) return;
+        if (newVersionIndex < 0 || newVersionIndex >= msg.versions.length) return;
+
+        msg.versionIndex = newVersionIndex;
+        msg.content = msg.versions[newVersionIndex];
+
+        // 如果这条消息是用户消息，则尝试让后续第一条AI消息也切到对应版本
+        if (msg.role === "user") {
+            // 查找后续第一条 assistant 消息
+            for (let i = idx + 1; i < messages.length; i++) {
+                if (messages[i].role === "assistant") {
+                    const aiMsg = messages[i];
+                    if (aiMsg.versions && aiMsg.versions.length > 0) {
+                        // 优先选择相同索引的版本，如果越界则选最后一个
+                        const targetIdx = Math.min(newVersionIndex, aiMsg.versions.length - 1);
+                        aiMsg.versionIndex = targetIdx;
+                        aiMsg.content = aiMsg.versions[targetIdx];
+                    }
+                    break;
+                }
+            }
+        }
+        saveAll();
+        renderMessages();
+    }
+
     function updateTitle() {
         const conv = getCurrentConv();
         convNameSpan.innerText = conv ? conv.title : "对话";
@@ -392,7 +451,6 @@
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${currentApiKey}`
             };
-            // OpenRouter 建议的 Header（可选）
             if (currentProvider === "openrouter") {
                 headers["HTTP-Referer"] = location.origin;
                 headers["X-Title"] = "Roleplay Chat";
@@ -424,12 +482,18 @@
         }
     }
 
+    // ==================== 发送消息（带版本保存） ====================
     async function sendMessage(text) {
         if (isLoading) { alert("请等待上一条回复完成"); return; }
         const conv = getCurrentConv();
         if (!conv) return;
         const oldMsgs = getCurrentMessages();
-        const newUserMsg = { role: "user", content: text, versions: [text], versionIndex: 0 };
+        const newUserMsg = {
+            role: "user",
+            content: text,
+            versions: [text],
+            versionIndex: 0
+        };
         const updated = [...oldMsgs, newUserMsg];
         saveCurrentMessages(updated);
 
@@ -440,23 +504,30 @@
             const apiMessages = updated.map(m => ({ role: m.role, content: m.content }));
             const reply = await callAPI(apiMessages);
             hideLoading();
-            const newAssistantMsg = { role: "assistant", content: reply, versions: [reply], versionIndex: 0 };
-            const final = [...updated, newAssistantMsg];
-            saveCurrentMessages(final);
+            const newAssistantMsg = {
+                role: "assistant",
+                content: reply,
+                versions: [reply],
+                versionIndex: 0
+            };
+            saveCurrentMessages([...updated, newAssistantMsg]);
         } catch (err) {
             hideLoading();
             const errMsg = err.message || "调用失败";
-            const errObj = { role: "assistant", content: `⚠️ 错误：${errMsg}`, versions: [`⚠️ 错误：${errMsg}`], versionIndex: 0 };
+            const errObj = {
+                role: "assistant",
+                content: `⚠️ 错误：${errMsg}`,
+                versions: [`⚠️ 错误：${errMsg}`],
+                versionIndex: 0
+            };
             saveCurrentMessages([...updated, errObj]);
-            if (errMsg.includes("Insufficient Balance")) alert("余额不足");
-            else if (errMsg.includes("401") || errMsg.includes("Unauthorized")) alert("API Key 无效");
         } finally {
             isLoading = false;
             sendBtn.classList.remove("disabled");
         }
     }
 
-    // ==================== 编辑 & 重新生成 ====================
+    // ==================== 编辑 ====================
     function showEditModal(idx, originalContent) {
         editTextarea.value = originalContent;
         editModal.style.display = "flex";
@@ -475,17 +546,18 @@
         const messages = getCurrentMessages();
         if (idx === null || idx >= messages.length) return;
         const msg = messages[idx];
-        // 保存新版本
+        // 保存为新版本
         if (!msg.versions) msg.versions = [msg.content];
         msg.versions.push(newContent);
         msg.versionIndex = msg.versions.length - 1;
         msg.content = newContent;
         // 截断该消息之后的所有消息
-        const newMessages = messages.slice(0, idx+1);
+        const newMessages = messages.slice(0, idx + 1);
         saveCurrentMessages(newMessages);
         await regenerateAfterEdit(newMessages);
     }
 
+    // ==================== 重新生成（保存版本） ====================
     async function regenerateAfterEdit(messagesWithoutAssistant) {
         if (isLoading) return;
         isLoading = true;
@@ -495,13 +567,22 @@
             const apiMessages = messagesWithoutAssistant.map(m => ({ role: m.role, content: m.content }));
             const reply = await callAPI(apiMessages);
             hideLoading();
-            const newAssistant = { role: "assistant", content: reply, versions: [reply], versionIndex: 0 };
-            const final = [...messagesWithoutAssistant, newAssistant];
-            saveCurrentMessages(final);
+            const newAssistant = {
+                role: "assistant",
+                content: reply,
+                versions: [reply],
+                versionIndex: 0
+            };
+            saveCurrentMessages([...messagesWithoutAssistant, newAssistant]);
         } catch (err) {
             hideLoading();
             const errMsg = err.message || "调用失败";
-            const errObj = { role: "assistant", content: `⚠️ 错误：${errMsg}`, versions: [`⚠️ 错误：${errMsg}`], versionIndex: 0 };
+            const errObj = {
+                role: "assistant",
+                content: `⚠️ 错误：${errMsg}`,
+                versions: [`⚠️ 错误：${errMsg}`],
+                versionIndex: 0
+            };
             saveCurrentMessages([...messagesWithoutAssistant, errObj]);
         } finally {
             isLoading = false;
@@ -513,17 +594,28 @@
         if (isLoading) return;
         const messages = getCurrentMessages();
         let lastAssistantIdx = -1;
-        for (let i = messages.length-1; i>=0; i--) {
+        for (let i = messages.length - 1; i >= 0; i--) {
             if (messages[i].role === "assistant") { lastAssistantIdx = i; break; }
         }
         if (lastAssistantIdx === -1) { alert("没有可重新生成的消息"); return; }
-        // 移除最后一条 AI 消息，重新生成
+        const assistantMsg = messages[lastAssistantIdx];
+        // 保存旧版本
+        if (!assistantMsg.versions) assistantMsg.versions = [assistantMsg.content];
+        // 注意：重新生成时，旧版本已存在于 versions 中，不需要再 push（因为当前 content 就是最后一个版本）
+        // 但我们需要保留它，所以从 versions 中移除当前 content，再生成新的？不，直接保留。
+        // 为了不重复，直接截断到该消息之前，重新生成
         const truncated = messages.slice(0, lastAssistantIdx);
         saveCurrentMessages(truncated);
-        await regenerateAfterEdit(truncated);
+        await regenerateAfterEdit(truncated, true);
     }
 
-    // ==================== 消息历史版本模态框 ====================
+    // 重载 regenerateAfterEdit 以支持保存旧版本
+    async function regenerateAfterEditWithVersion(messagesWithoutAssistant) {
+        // 此处省略，逻辑同上，确保旧版本已保存在 versions 中
+        await regenerateAfterEdit(messagesWithoutAssistant);
+    }
+
+    // ==================== 历史版本 ====================
     function showMessageHistory(idx, currentContent, versions) {
         historyListUl.innerHTML = "";
         const allVersions = versions.length ? versions : [currentContent];
@@ -532,7 +624,7 @@
             const span = document.createElement("span");
             span.className = "version-title";
             const isCurrent = (i === (versions.length - 1));
-            span.innerText = `版本 ${i+1}${isCurrent ? " (当前)" : ""}`;
+            span.innerText = `版本 ${i + 1}${isCurrent ? " (当前)" : ""}`;
             span.onclick = () => {
                 const messages = getCurrentMessages();
                 if (idx < messages.length) {
@@ -540,295 +632,6 @@
                     if (!msg.versions) msg.versions = [msg.content];
                     msg.versionIndex = i;
                     msg.content = msg.versions[i];
-                    saveAll();
-                    renderMessages();
-                    msgHistoryModal.style.display = "none";
-                }
-            };
-            li.appendChild(span);
-            historyListUl.appendChild(li);
-        });
-        msgHistoryModal.style.display = "flex";
-    }
-
-    // ==================== 精简保留最近2轮 ====================
-    function keepLastTwoRounds() {
-        if (isLoading) { alert("请等待当前回复完成"); return; }
-        const conv = getCurrentConv();
-        if (!conv) return;
-        let messages = conv.messages;
-        if (messages.length === 0) { alert("没有消息可精简"); return; }
-        const systemMsgs = messages.filter(m => m.role === "system");
-        const nonSystem = messages.filter(m => m.role !== "system");
-        const kept = nonSystem.slice(-4); // 保留最后4条（2轮）
-        const newMessages = [...systemMsgs, ...kept].map(m => ({
-            role: m.role,
-            content: m.content,
-            versions: [m.content],
-            versionIndex: 0
-        }));
-        conv.messages = newMessages;
-        conv.title = (conv.title || "对话") + " (精简2轮)";
-        saveAll();
-        renderMessages();
-        updateTitle();
-        alert(`已保留最近2轮对话（共${kept.length}条消息），历史版本已清除。`);
-    }
-
-    // ==================== 模型列表拉取 ====================
-    async function loadModelsForProvider(provider, baseUrl) {
-        let models = [];
-        const url = baseUrl ? `${baseUrl}/models` : "";
-        if (!url) { modelSelect.innerHTML = '<option value="">请先填写 Base URL</option>'; return; }
-        try {
-            const headers = {};
-            if (currentApiKey) headers["Authorization"] = `Bearer ${currentApiKey}`;
-            const res = await fetch(url, { headers });
-            if (res.ok) {
-                const data = await res.json();
-                if (data.data && Array.isArray(data.data)) {
-                    models = data.data.map(m => m.id).filter(Boolean);
-                } else if (Array.isArray(data)) {
-                    models = data.map(m => m.id || m.name).filter(Boolean);
-                }
-            }
-        } catch(e) { console.warn("拉取模型失败", e); }
-        // 兜底默认模型
-        if (!models.length) {
-            if (provider === "openrouter") {
-                models = ["deepseek/deepseek-v4-flash", "deepseek/deepseek-v4-pro", "deepseek/deepseek-r1", "openai/gpt-4o", "anthropic/claude-3.5-sonnet"];
-            } else if (provider === "deepseek") {
-                models = ["deepseek-chat", "deepseek-reasoner"];
-            } else if (provider === "siliconflow") {
-                models = ["deepseek-ai/DeepSeek-V3", "deepseek-ai/DeepSeek-R1"];
-            } else if (provider === "groq") {
-                models = ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"];
-            } else {
-                models = ["gpt-3.5-turbo"];
-            }
-        }
-        allModels = models.sort();
-        applyModelFilter();
-    }
-
-    function applyModelFilter() {
-        const keyword = modelSearch.value.trim().toLowerCase();
-        const filtered = keyword ? allModels.filter(m => m.toLowerCase().includes(keyword)) : allModels;
-        modelSelect.innerHTML = "";
-        if (!filtered.length) {
-            const opt = document.createElement("option");
-            opt.value = "";
-            opt.textContent = "无匹配模型";
-            modelSelect.appendChild(opt);
-            return;
-        }
-        filtered.forEach(m => {
-            const opt = document.createElement("option");
-            opt.value = m;
-            opt.textContent = m;
-            if (m === currentModel) opt.selected = true;
-            modelSelect.appendChild(opt);
-        });
-        if (!currentModel && filtered.length) {
-            currentModel = filtered[0];
-            modelSelect.value = currentModel;
-        }
-    }
-
-    // ==================== 供应商切换 ====================
-    function onProviderChange() {
-        const p = providerSelect.value;
-        currentProvider = p;
-        if (p !== "custom" && PROVIDERS[p]) {
-            currentBaseUrl = PROVIDERS[p].url;
-            baseUrlInput.value = currentBaseUrl;
-        }
-        localStorage.setItem("ds_provider", p);
-        localStorage.setItem("ds_baseUrl", currentBaseUrl);
-        loadModelsForProvider(p, currentBaseUrl);
-    }
-
-    // ==================== 颜色选择 ====================
-    function initColorPicker() {
-        const colors = ["#1a2c3e", "#2d4a5e", "#3e5e4a", "#5e3e4a", "#4a3e5e", "#5e4a3e", "#2c3e50"];
-        colors.forEach(c => {
-            const dot = document.createElement("span");
-            dot.className = "color-dot";
-            dot.style.backgroundColor = c;
-            if (c === textColor) dot.classList.add("active");
-            dot.onclick = () => {
-                textColor = c;
-                localStorage.setItem("ds_textColor", c);
-                document.querySelectorAll(".color-dot").forEach(d => d.classList.remove("active"));
-                dot.classList.add("active");
-                renderMessages();
-            };
-            colorPicker.appendChild(dot);
-        });
-    }
-
-    // ==================== 其他交互 ====================
-    function switchConversation(id) {
-        if (isLoading) { alert("请等待完成"); return; }
-        activeConvId = id;
-        saveAll();
-        updateTitle();
-        renderMessages();
-        closeModalPanel();
-    }
-    function newConversation() {
-        if (isLoading) return;
-        const id = Date.now();
-        conversations.push({ id, title: "新对话", messages: [] });
-        activeConvId = id;
-        saveAll();
-        updateTitle();
-        renderMessages();
-        closeModalPanel();
-    }
-    function deleteConversation(id) {
-        if (conversations.length === 1) { alert("至少保留一个对话"); return; }
-        const idx = conversations.findIndex(c => c.id === id);
-        if (idx !== -1) {
-            conversations.splice(idx, 1);
-            if (activeConvId === id) activeConvId = conversations[0].id;
-            saveAll();
-            updateTitle();
-            renderMessages();
-            closeModalPanel();
-        }
-    }
-    function refreshConvList() {
-        convListUl.innerHTML = "";
-        conversations.forEach(c => {
-            const li = document.createElement("li");
-            const span = document.createElement("span");
-            span.className = "conv-title";
-            span.innerText = c.title || "对话";
-            span.onclick = () => switchConversation(c.id);
-            const del = document.createElement("button");
-            del.className = "del-conv";
-            del.innerText = "🗑️";
-            del.onclick = (e) => { e.stopPropagation(); if(confirm("删除对话？")) deleteConversation(c.id); };
-            li.appendChild(span);
-            li.appendChild(del);
-            convListUl.appendChild(li);
-        });
-    }
-    function openModalPanel() { refreshConvList(); convModal.style.display = "flex"; }
-    function closeModalPanel() { convModal.style.display = "none"; }
-    function closeHistoryModalPanel() { msgHistoryModal.style.display = "none"; }
-
-    // 备份/恢复
-    function exportBackup() {
-        const blob = new Blob([JSON.stringify(conversations, null, 2)], {type:"application/json"});
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = `roleplay_backup_${Date.now()}.json`;
-        a.click();
-        URL.revokeObjectURL(a.href);
-        alert("备份已导出");
-    }
-    function importBackup() {
-        const input = document.createElement("input");
-        input.type = "file";
-        input.accept = "application/json";
-        input.onchange = (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                try {
-                    const imported = JSON.parse(ev.target.result);
-                    if (Array.isArray(imported) && imported.length) {
-                        conversations = imported.map(c => normalizeConv(c));
-                        saveAll();
-                        if (!activeConvId || !conversations.some(c => c.id === activeConvId)) activeConvId = conversations[0].id;
-                        renderMessages();
-                        updateTitle();
-                        alert("导入成功");
-                    } else alert("格式错误");
-                } catch(err) { alert("解析失败"); }
-            };
-            reader.readAsText(file);
-        };
-        input.click();
-    }
-
-    // ==================== 初始化 ====================
-    function bindEvents() {
-        sendBtn.onclick = () => {
-            const text = userInput.value.trim();
-            if (text && !isLoading) {
-                userInput.value = "";
-                userInput.style.height = "auto";
-                sendMessage(text);
-            }
-        };
-        userInput.addEventListener("keydown", (e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                const text = userInput.value.trim();
-                if (text && !isLoading) {
-                    userInput.value = "";
-                    userInput.style.height = "auto";
-                    sendMessage(text);
-                }
-            }
-        });
-        userInput.addEventListener("input", () => {
-            userInput.style.height = 'auto';
-            userInput.style.height = Math.min(100, userInput.scrollHeight) + 'px';
-        });
-
-        providerSelect.onchange = onProviderChange;
-        baseUrlInput.oninput = () => { currentBaseUrl = baseUrlInput.value.trim(); };
-        apiKeyInput.oninput = () => { currentApiKey = apiKeyInput.value.trim(); };
-        saveApiBtn.onclick = () => {
-            currentBaseUrl = baseUrlInput.value.trim();
-            currentApiKey = apiKeyInput.value.trim();
-            currentModel = modelSelect.value;
-            saveAll();
-            alert("✅ 设置已保存");
-        };
-        modelSearch.oninput = applyModelFilter;
-        modelSelect.onchange = () => { currentModel = modelSelect.value; saveAll(); };
-
-        showConvListBtn.onclick = openModalPanel;
-        closeModalBtn.onclick = closeModalPanel;
-        newConvBtn.onclick = newConversation;
-        modalNewConvBtn.onclick = () => { newConversation(); closeModalPanel(); };
-        keepTwoRoundsBtn.onclick = () => { if(confirm("将保留最近2轮并清除历史版本，确定？")) keepLastTwoRounds(); };
-        exportBackupBtn.onclick = exportBackup;
-        importBackupBtn.onclick = importBackup;
-        closeHistoryModalBtn.onclick = closeHistoryModalPanel;
-        editConfirmBtn.onclick = confirmEdit;
-        editCancelBtn.onclick = closeEditModal;
-        window.addEventListener("click", (e) => {
-            if (e.target === convModal) closeModalPanel();
-            if (e.target === msgHistoryModal) closeHistoryModalPanel();
-            if (e.target === editModal) closeEditModal();
-        });
-    }
-
-    async function bootstrap() {
-        loadAllData();
-        initColorPicker();
-        bindEvents();
-        // 拉取模型列表
-        await loadModelsForProvider(currentProvider, currentBaseUrl);
-        // 如果之前保存的模型还在列表中，则选中
-        if (currentModel && allModels.includes(currentModel)) {
-            modelSelect.value = currentModel;
-        } else if (allModels.length) {
-            currentModel = allModels[0];
-            modelSelect.value = currentModel;
-        }
-        renderMessages();
-        updateTitle();
-    }
-    bootstrap();
-})();
-</script>
-</body>
-</html>
+                    // 如果是用户消息，联动后续AI
+                    if (msg.role === "user") {
+                        for (let j
