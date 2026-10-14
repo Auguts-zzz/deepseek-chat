@@ -544,7 +544,8 @@ if(p==="deepseek"){
 const b=data.balance_infos?.[0];
 balanceDisplay.innerText=b?`${Number(b.total_balance).toFixed(2)} ${b.currency}`:"未知";
 }else if(p==="openrouter"){
-balanceDisplay.innerText=data.data?`$${Number(data.data.total_credits).toFixed(2)}`:"未知";
+const total = data.data?.total_credits, used = data.data?.total_usage;
+balanceDisplay.innerText = (total !== undefined && used !== undefined) ? `$${(Number(total) - Number(used)).toFixed(2)}` : "未知";
 }else if(p==="siliconflow"){
 balanceDisplay.innerText=data.data?`¥${Number(data.data.balance).toFixed(2)}`:"未知";
 }
