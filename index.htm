@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=yes,viewport-fit=cover">
-<title>261014 16:55</title>
+<title>261014 17:01</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{background:#e9eef4;font-family:system-ui,sans-serif;display:flex;justify-content:center;min-height:100vh}
@@ -289,16 +289,16 @@ function switchMessageVersion(idx, newIndex) {
     msg.versionIndex = newIndex;
     msg.content = msg.versions[newIndex];
 
-    // 如果切换的是用户消息，联动后续所有 AI 消息
+    // 如果是用户消息，找到紧跟着它的 AI 回复，一起切换
     if (msg.role === "user") {
-        for (let i = idx + 1; i < msgs.length; i++) {
-            if (msgs[i].role === "assistant") {
-                const ai = msgs[i];
-                if (ai.versions && ai.versions.length > 0) {
-                    const target = Math.min(newIndex, ai.versions.length - 1);
-                    ai.versionIndex = target;
-                    ai.content = ai.versions[target];
-                }
+        const aiIdx = idx + 1;
+        if (aiIdx < msgs.length && msgs[aiIdx].role === "assistant") {
+            const ai = msgs[aiIdx];
+            if (ai.versions && ai.versions.length > 0) {
+                // 关键：用相同的版本索引，如果越界则取最后一个
+                const target = Math.min(newIndex, ai.versions.length - 1);
+                ai.versionIndex = target;
+                ai.content = ai.versions[target];
             }
         }
     }
@@ -367,18 +367,19 @@ async function confirmEdit() {
     msg.versionIndex = msg.versions.length - 1;
     msg.content = newContent;
 
-    // 2. 找到紧跟其后的 AI 回复（idx+1）
+    // 2. 找到紧跟其后的 AI 回复，把它的当前内容也存进 versions
     const aiIdx = idx + 1;
     if (aiIdx < msgs.length && msgs[aiIdx].role === "assistant") {
         const ai = msgs[aiIdx];
-        // 确保 AI 的版本数组与用户消息的版本数组长度对齐
         if (!ai.versions) ai.versions = [ai.content];
-        // 补齐：如果用户版本比 AI 版本多，需要先保存当前 AI 内容到对应位置
-        // 这里的做法是：把这个 AI 内容视为「对应用户当前版本（新版本）之前的版本」的回复，
-        // 但由于是新编辑，AI 还没回复新版本，所以先不做对齐，等新回复生成后由 regenerateAfterEdit 追加。
+        // 只有当前内容不在 versions 末尾时才加入
+        if (ai.versions[ai.versions.length - 1] !== ai.content) {
+            ai.versions.push(ai.content);
+        }
+        ai.versionIndex = ai.versions.length - 1;
     }
 
-    // 3. 截断到该用户消息（包含它自己），后续 AI 回复将被重新生成
+    // 3. 截断到该用户消息（包括它自己），后续 AI 重新生成
     const newMsgs = msgs.slice(0, idx + 1);
     saveCurrentMessages(newMsgs);
     await regenerateAfterEdit(newMsgs);
@@ -401,11 +402,9 @@ async function regenerateAfterEdit(msgsWithoutAI) {
         if (targetIdx < original.length && original[targetIdx].role === "assistant") {
             const ai = original[targetIdx];
             if (!ai.versions) ai.versions = [ai.content];
-            // 检查当前内容是否已在 versions 中，若不在则先保存
             if (ai.versions[ai.versions.length - 1] !== ai.content) {
                 ai.versions.push(ai.content);
             }
-            // 再追加新回复
             ai.versions.push(reply);
             ai.versionIndex = ai.versions.length - 1;
             ai.content = reply;
