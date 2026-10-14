@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=yes,viewport-fit=cover">
-<title>261014 15:42</title>
+<title>261014 16:47</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{background:#e9eef4;font-family:system-ui,sans-serif;display:flex;justify-content:center;min-height:100vh}
@@ -378,16 +378,14 @@ async function regenerateAfterEdit(msgsWithoutAI) {
         const reply = await callAPI(apiMsgs);
         hideLoading();
 
-        // 找到原对话中最后一条 AI 消息（就是被重新生成的那条）
         const conv = getCurrentConv();
+        // 关键：目标 AI 消息的索引 = msgsWithoutAI.length
+        const targetIdx = msgsWithoutAI.length;
         const original = conv.messages;
-        // 从末尾向前找第一条 assistant
-        let lastAI = -1;
-        for (let i = original.length - 1; i >= 0; i--) {
-            if (original[i].role === "assistant") { lastAI = i; break; }
-        }
-        if (lastAI !== -1) {
-            const ai = original[lastAI];
+
+        if (targetIdx < original.length && original[targetIdx].role === "assistant") {
+            // 存在对应的 AI 消息，追加版本
+            const ai = original[targetIdx];
             if (!ai.versions) ai.versions = [ai.content];
             ai.versions.push(reply);
             ai.versionIndex = ai.versions.length - 1;
@@ -395,9 +393,10 @@ async function regenerateAfterEdit(msgsWithoutAI) {
             saveAll();
             renderMessages();
         } else {
-            // 万一找不到，就作为新消息追加
+            // 不存在，插入一条新的 AI 消息
             const newAI = { role: "assistant", content: reply, versions: [reply], versionIndex: 0 };
-            saveCurrentMessages([...msgsWithoutAI, newAI]);
+            const updated = [...msgsWithoutAI, newAI];
+            saveCurrentMessages(updated);
         }
     } catch (err) {
         hideLoading();
