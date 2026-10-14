@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=yes,viewport-fit=cover">
-<title>261014 16:47</title>
+<title>261014 15:42</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{background:#e9eef4;font-family:system-ui,sans-serif;display:flex;justify-content:center;min-height:100vh}
@@ -352,20 +352,36 @@ saveCurrentMessages([...updated,errObj]);
 function showEditModal(idx,originalContent){editTextarea.value=originalContent;editModal.style.display="flex";window._pendingEditIdx=idx;}
 function closeEditModal(){editModal.style.display="none";window._pendingEditIdx=null;}
 
-async function confirmEdit(){
-const newContent=editTextarea.value.trim();
-if(newContent===""){closeEditModal();return;}
-const idx=window._pendingEditIdx;closeEditModal();
-const msgs=getCurrentMessages();
-if(idx===null||idx>=msgs.length)return;
-const msg=msgs[idx];
-if(!msg.versions)msg.versions=[msg.content];
-msg.versions.push(newContent);
-msg.versionIndex=msg.versions.length-1;
-msg.content=newContent;
-const newMsgs=msgs.slice(0,idx+1);
-saveCurrentMessages(newMsgs);
-await regenerateAfterEdit(newMsgs);
+async function confirmEdit() {
+    const newContent = editTextarea.value.trim();
+    if (newContent === "") { closeEditModal(); return; }
+    const idx = window._pendingEditIdx;
+    closeEditModal();
+    const msgs = getCurrentMessages();
+    if (idx === null || idx >= msgs.length) return;
+    const msg = msgs[idx];
+
+    // 1. 给用户消息追加新版本
+    if (!msg.versions) msg.versions = [msg.content];
+    msg.versions.push(newContent);
+    msg.versionIndex = msg.versions.length - 1;
+    msg.content = newContent;
+
+    // 2. 找到紧跟其后的 AI 回复（idx+1）
+    const aiIdx = idx + 1;
+    if (aiIdx < msgs.length && msgs[aiIdx].role === "assistant") {
+        const ai = msgs[aiIdx];
+        // 确保 AI 的版本数组与用户消息的版本数组长度对齐
+        if (!ai.versions) ai.versions = [ai.content];
+        // 补齐：如果用户版本比 AI 版本多，需要先保存当前 AI 内容到对应位置
+        // 这里的做法是：把这个 AI 内容视为「对应用户当前版本（新版本）之前的版本」的回复，
+        // 但由于是新编辑，AI 还没回复新版本，所以先不做对齐，等新回复生成后由 regenerateAfterEdit 追加。
+    }
+
+    // 3. 截断到该用户消息（包含它自己），后续 AI 回复将被重新生成
+    const newMsgs = msgs.slice(0, idx + 1);
+    saveCurrentMessages(newMsgs);
+    await regenerateAfterEdit(newMsgs);
 }
 
 async function regenerateAfterEdit(msgsWithoutAI) {
@@ -379,24 +395,25 @@ async function regenerateAfterEdit(msgsWithoutAI) {
         hideLoading();
 
         const conv = getCurrentConv();
-        // 关键：目标 AI 消息的索引 = msgsWithoutAI.length
         const targetIdx = msgsWithoutAI.length;
         const original = conv.messages;
 
         if (targetIdx < original.length && original[targetIdx].role === "assistant") {
-            // 存在对应的 AI 消息，追加版本
             const ai = original[targetIdx];
             if (!ai.versions) ai.versions = [ai.content];
+            // 检查当前内容是否已在 versions 中，若不在则先保存
+            if (ai.versions[ai.versions.length - 1] !== ai.content) {
+                ai.versions.push(ai.content);
+            }
+            // 再追加新回复
             ai.versions.push(reply);
             ai.versionIndex = ai.versions.length - 1;
             ai.content = reply;
             saveAll();
             renderMessages();
         } else {
-            // 不存在，插入一条新的 AI 消息
             const newAI = { role: "assistant", content: reply, versions: [reply], versionIndex: 0 };
-            const updated = [...msgsWithoutAI, newAI];
-            saveCurrentMessages(updated);
+            saveCurrentMessages([...msgsWithoutAI, newAI]);
         }
     } catch (err) {
         hideLoading();
