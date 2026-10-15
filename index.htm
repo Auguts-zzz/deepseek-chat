@@ -489,12 +489,12 @@ let msgs=conv.messages;
 if(!msgs.length){alert("没有消息可精简");return;}
 const sys=msgs.filter(m=>m.role==="system");
 const nonSys=msgs.filter(m=>m.role!=="system");
-const kept=nonSys.slice(-4);
+const kept=nonSys.slice(-20);
 const newMsgs=[...sys,...kept].map(m=>({role:m.role,content:m.content,versions:[m.content],versionIndex:0}));
 conv.messages=newMsgs;
-conv.title=(conv.title||"对话")+" (精简2轮)";
+conv.title=(conv.title||"对话")+" (精简10轮)";
 saveAll();renderMessages();updateTitle();
-alert(`已保留最近2轮（共${kept.length}条消息）。`);
+alert(`已保留最近10轮（共${kept.length}条消息）。`);
 }
 
 async function loadModelsForProvider(provider,baseUrl){
