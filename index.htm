@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=yes,viewport-fit=cover">
-<title>261015 8:52</title>
+<title>261016 11:01</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{background:#e9eef4;font-family:system-ui,sans-serif;display:flex;justify-content:center;min-height:100vh}
@@ -286,22 +286,24 @@ function switchMessageVersion(idx, newIndex) {
     if (!msg || !msg.versions) return;
     if (newIndex < 0 || newIndex >= msg.versions.length) return;
 
+    // 1. 切换当前消息的版本
     msg.versionIndex = newIndex;
     msg.content = msg.versions[newIndex];
 
-    // 如果是用户消息，找到紧跟着它的 AI 回复，一起切换
+    // 2. 如果是用户消息，把紧随其后的 AI 回复也切到同一版本索引
     if (msg.role === "user") {
         const aiIdx = idx + 1;
         if (aiIdx < msgs.length && msgs[aiIdx].role === "assistant") {
             const ai = msgs[aiIdx];
             if (ai.versions && ai.versions.length > 0) {
-                // 关键：用相同的版本索引，如果越界则取最后一个
+                // 优先选相同索引；若 AI 没有该版本，则取最后一个可用版本
                 const target = Math.min(newIndex, ai.versions.length - 1);
                 ai.versionIndex = target;
                 ai.content = ai.versions[target];
             }
         }
     }
+
     saveAll();
     renderMessages();
 }
