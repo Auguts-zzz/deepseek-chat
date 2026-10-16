@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=yes,viewport-fit=cover">
-<title>角色扮演助手 · 版本联动</title>
+<title>2610161707</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{background:#e9eef4;font-family:system-ui,sans-serif;display:flex;justify-content:center;min-height:100vh}
@@ -156,33 +156,21 @@ localStorage.setItem("ds_apiKey",currentApiKey);
 localStorage.setItem("ds_model",currentModel);
 }
 
-// 兼容旧数据：把旧结构转换成新版数据结构
+// 兼容旧数据
 function normalizeConv(conv){
 if(!conv.messages)conv.messages=[];
 conv.messages.forEach(msg=>{
-// 旧数据可能是 {content, versions:[string,...]}，需要转成 {versions:[{userContent,aiContent}]}
-if(msg.versions&&typeof msg.versions[0]==="string"){
-if(msg.role==="user"){
-const pairs=msg.versions.map(v=>({userContent:v,aiContent:null}));
-msg.versions=pairs;
-msg.versionIndex=msg.versionIndex||0;
-}else{
-// AI 消息的 versions 保持字符串数组，兼容旧结构
-msg.versionIndex=msg.versionIndex||0;
-}
-}else if(msg.versions&&msg.versions[0]&&typeof msg.versions[0]==="object"){
-// 用户消息新结构已经OK
-msg.versionIndex=msg.versionIndex||0;
-}else{
-// 无 versions
-if(msg.role==="user"){
-msg.versions=[{userContent:msg.content,aiContent:null}];
+if(!msg.versions){
+if(msg.role==="user")msg.versions=[{userContent:msg.content,aiContent:null,afterMsgs:[]}];
+else msg.versions=[msg.content];
 msg.versionIndex=0;
-}else{
-msg.versions=[msg.content];
-msg.versionIndex=0;
+}else if(typeof msg.versions[0]==="string"&&msg.role==="user"){
+// 旧版用户消息：versions 是字符串数组
+const newV=msg.versions.map(v=>({userContent:v,aiContent:null,afterMsgs:[]}));
+msg.versions=newV;
+msg.versionIndex=msg.versionIndex||0;
 }
-}
+if(msg.versionIndex===undefined)msg.versionIndex=0;
 });
 if(!conv.title)conv.title="对话";
 return conv;
@@ -255,7 +243,7 @@ copyBtn.innerHTML="📋 复制";
 copyBtn.onclick=async e=>{e.stopPropagation();await navigator.clipboard.writeText(msg.content);copyBtn.innerHTML="✅";setTimeout(()=>copyBtn.innerHTML="📋 复制",1000);};
 actions.appendChild(copyBtn);
 // 版本导航
-const versionsCount=(msg.role==="user")?msg.versions.length:(msg.versions?msg.versions.length:0);
+const versionsCount=msg.versions?msg.versions.length:1;
 if(versionsCount>1){
 const versionNav=document.createElement("span");
 versionNav.className="version-nav";
@@ -275,7 +263,7 @@ actions.appendChild(versionNav);
 }
 const historyBtn=document.createElement("button");
 historyBtn.className="action-btn";historyBtn.innerHTML="📜 历史";
-historyBtn.onclick=e=>{e.stopPropagation();showMessageHistory(idx,msg.content,msg.versions||[]);};
+historyBtn.onclick=e=>{e.stopPropagation();showMessageHistory(idx,msg);};
 actions.appendChild(historyBtn);
 if(isUser){
 const editBtn=document.createElement("button");
@@ -301,46 +289,32 @@ msgContainer.appendChild(div);
 msgContainer.scrollTop=msgContainer.scrollHeight;
 }
 
-// 切换版本（用户和 AI 联动）
+// 切换版本（用户消息切换时恢复后续；AI消息切换只改自己）
 function switchMessageVersion(idx,newIndex){
 const conv=getCurrentConv();
 if(!conv)return;
-const msgs=conv.messages;
+let msgs=conv.messages;
 const msg=msgs[idx];
 if(!msg||!msg.versions)return;
 if(newIndex<0||newIndex>=msg.versions.length)return;
 
 if(msg.role==="user"){
-// 用户消息：新数据结构 [{userContent,aiContent},...]
 msg.versionIndex=newIndex;
-msg.content=msg.versions[newIndex].userContent;
-// 找到紧随其后的 AI 消息，切到同一索引
-const aiIdx=idx+1;
-if(aiIdx<msgs.length&&msgs[aiIdx].role==="assistant"){
-const ai=msgs[aiIdx];
-if(ai.versions&&ai.versions.length>0){
-const target=Math.min(newIndex,ai.versions.length-1);
-ai.versionIndex=target;
-ai.content=ai.versions[target];
+const ver=msg.versions[newIndex];
+msg.content=ver.userContent;
+// 从该用户消息开始，后面按快照重建
+let rebuilt=msgs.slice(0,idx+1);
+if(ver.afterMsgs&&ver.afterMsgs.length){
+ver.afterMsgs.forEach(m=>rebuilt.push(JSON.parse(JSON.stringify(m))));
+}else if(ver.aiContent!==null&&ver.aiContent!==undefined){
+rebuilt.push({role:"assistant",content:ver.aiContent,versions:[ver.aiContent],versionIndex:0});
 }
-}
+saveCurrentMessages(rebuilt);
 }else{
-// AI 消息
 msg.versionIndex=newIndex;
 msg.content=msg.versions[newIndex];
-// 如果上方是用户消息，同步切到同一索引（让用户消息保持一致）
-const userIdx=idx-1;
-if(userIdx>=0&&msgs[userIdx].role==="user"){
-const u=msgs[userIdx];
-if(u.versions&&u.versions.length>0){
-const target=Math.min(newIndex,u.versions.length-1);
-u.versionIndex=target;
-u.content=u.versions[target].userContent;
+saveCurrentMessages(msgs);
 }
-}
-}
-saveAll();
-renderMessages();
 }
 
 function updateTitle(){const c=getCurrentConv();convNameSpan.innerText=c?c.title:"对话";}
@@ -369,18 +343,19 @@ async function sendMessage(text){
 if(isLoading){alert("请等待上一条回复完成");return;}
 const conv=getCurrentConv();if(!conv)return;
 const oldMsgs=getCurrentMessages();
-const newUser={role:"user",content:text,versions:[{userContent:text,aiContent:null}],versionIndex:0};
+const newUser={role:"user",content:text,versions:[{userContent:text,aiContent:null,afterMsgs:[]}],versionIndex:0};
 const newAI={role:"assistant",content:"",versions:[null],versionIndex:0};
 const updated=[...oldMsgs,newUser,newAI];
 saveCurrentMessages(updated);
 isLoading=true;sendBtn.classList.add("disabled");showLoading();
 try{
-const apiMsgs=updated.filter(m=>m.content).map(m=>({role:m.role,content:m.content}));
-// 去掉 AI 空消息
-const requestMsgs=apiMsgs.filter(m=>m.role!=="assistant"||m.content);
+const requestMsgs=[SYSTEM_MESSAGE];
+for(const m of updated){
+if(m.role==="user")requestMsgs.push({role:"user",content:m.content});
+else if(m.role==="assistant"&&m.content)requestMsgs.push({role:"assistant",content:m.content});
+}
 const reply=await callAPI(requestMsgs);
 hideLoading();
-// 填入版本对
 const u=updated[updated.length-2];
 const a=updated[updated.length-1];
 u.versions[0].aiContent=reply;
@@ -408,47 +383,34 @@ const newContent=editTextarea.value.trim();
 if(newContent===""){closeEditModal();return;}
 const idx=window._pendingEditIdx;
 closeEditModal();
-const msgs=getCurrentMessages();
+let msgs=getCurrentMessages();
 if(idx===null||idx>=msgs.length)return;
 const userMsg=msgs[idx];
 if(userMsg.role!=="user")return;
 
-// 1. 用户消息追加新版本（aiContent 先占位 null）
-userMsg.versions.push({userContent:newContent,aiContent:null});
+// 1. 旧版本保存完整后续快照（含各自版本）
+const oldVer=userMsg.versions[userMsg.versionIndex];
+if(!oldVer.afterMsgs||oldVer.afterMsgs.length===0){
+oldVer.afterMsgs=JSON.parse(JSON.stringify(msgs.slice(idx+1)));
+}
+
+// 2. 追加新版本
+userMsg.versions.push({userContent:newContent,aiContent:null,afterMsgs:[]});
 userMsg.versionIndex=userMsg.versions.length-1;
 userMsg.content=newContent;
 
-// 2. 找紧随其后的 AI 消息
-const aiIdx=idx+1;
-let aiMsg=null;
-if(aiIdx<msgs.length&&msgs[aiIdx].role==="assistant"){
-aiMsg=msgs[aiIdx];
-// AI versions 长度需要和用户对齐，先补一个 null 占位
-while(aiMsg.versions.length<userMsg.versions.length){
-aiMsg.versions.push(null);
-}
-aiMsg.versionIndex=userMsg.versionIndex;
-aiMsg.content="";
-}else{
-// 没有 AI 消息，就追加一个
-aiMsg={role:"assistant",content:"",versions:new Array(userMsg.versions.length).fill(null),versionIndex:userMsg.versionIndex};
-msgs.splice(idx+1,0,aiMsg);
-}
-
+// 3. 截断到该用户消息之后，重新生成
+msgs=msgs.slice(0,idx+1);
 saveCurrentMessages(msgs);
-
-// 3. 基于当前用户消息和之前所有消息重新生成 AI 回复
 await regenerateAIForUser(msgs,idx);
 }
 
-// 基于指定用户消息索引生成 AI 回复
+// 基于指定用户消息重新生成 AI
 async function regenerateAIForUser(msgs,userIdx){
 if(isLoading)return;
 isLoading=true;sendBtn.classList.add("disabled");showLoading();
 try{
-// 请求消息：系统 + 到 userIdx 为止的所有非空消息
-const req=[];
-req.push(SYSTEM_MESSAGE);
+const req=[SYSTEM_MESSAGE];
 for(let i=0;i<=userIdx;i++){
 const m=msgs[i];
 if(m.role==="user")req.push({role:"user",content:m.content});
@@ -457,26 +419,22 @@ else if(m.role==="assistant"&&m.content)req.push({role:"assistant",content:m.con
 const reply=await callAPI(req);
 hideLoading();
 const userMsg=msgs[userIdx];
-const aiMsg=msgs[userIdx+1];
 userMsg.versions[userMsg.versionIndex].aiContent=reply;
-aiMsg.versions[userMsg.versionIndex]=reply;
-aiMsg.versionIndex=userMsg.versionIndex;
-aiMsg.content=reply;
-saveCurrentMessages(msgs);
+const aiMsg={role:"assistant",content:reply,versions:[reply],versionIndex:0};
+userMsg.versions[userMsg.versionIndex].afterMsgs=[JSON.parse(JSON.stringify(aiMsg))];
+saveCurrentMessages([...msgs.slice(0,userIdx+1),aiMsg]);
 }catch(err){
 hideLoading();
 const errMsg=err.message||"调用失败";
 const userMsg=msgs[userIdx];
-const aiMsg=msgs[userIdx+1];
 userMsg.versions[userMsg.versionIndex].aiContent=`⚠️ 错误：${errMsg}`;
-aiMsg.versions[userMsg.versionIndex]=`⚠️ 错误：${errMsg}`;
-aiMsg.versionIndex=userMsg.versionIndex;
-aiMsg.content=`⚠️ 错误：${errMsg}`;
-saveCurrentMessages(msgs);
+const aiMsg={role:"assistant",content:`⚠️ 错误：${errMsg}`,versions:[`⚠️ 错误：${errMsg}`],versionIndex:0};
+userMsg.versions[userMsg.versionIndex].afterMsgs=[JSON.parse(JSON.stringify(aiMsg))];
+saveCurrentMessages([...msgs.slice(0,userIdx+1),aiMsg]);
 }finally{isLoading=false;sendBtn.classList.remove("disabled");}
 }
 
-// 重新生成最后一条 AI 回复（在当前用户版本上）
+// 重新生成最后一条 AI
 async function regenerateLastAssistant(){
 if(isLoading)return;
 const msgs=getCurrentMessages();
@@ -485,24 +443,73 @@ for(let i=msgs.length-1;i>=0;i--){if(msgs[i].role==="assistant"){lastAI=i;break;
 if(lastAI===-1){alert("没有可重新生成的消息");return;}
 const userIdx=lastAI-1;
 if(userIdx<0||msgs[userIdx].role!=="user"){alert("无法定位对应的用户消息");return;}
-await regenerateAIForUser(msgs,userIdx);
+// 给 AI 消息追加新版本
+const aiMsg=msgs[lastAI];
+if(!aiMsg.versions)aiMsg.versions=[aiMsg.content];
+// 基于当前用户版本重新生成
+await regenerateAIForUserWithVersion(msgs,userIdx,lastAI);
 }
 
-function showMessageHistory(idx,currentContent,versions){
+async function regenerateAIForUserWithVersion(msgs,userIdx,aiIdx){
+if(isLoading)return;
+isLoading=true;sendBtn.classList.add("disabled");showLoading();
+try{
+const req=[SYSTEM_MESSAGE];
+for(let i=0;i<=userIdx;i++){
+const m=msgs[i];
+if(m.role==="user")req.push({role:"user",content:m.content});
+else if(m.role==="assistant"&&m.content)req.push({role:"assistant",content:m.content});
+}
+const reply=await callAPI(req);
+hideLoading();
+const aiMsg=msgs[aiIdx];
+aiMsg.versions.push(reply);
+aiMsg.versionIndex=aiMsg.versions.length-1;
+aiMsg.content=reply;
+// 同步到用户当前版本
+const userMsg=msgs[userIdx];
+if(userMsg.versions[userMsg.versionIndex]){
+userMsg.versions[userMsg.versionIndex].aiContent=reply;
+// 如果当前 afterMsgs 第一条就是这条 AI，同步内容
+if(userMsg.versions[userMsg.versionIndex].afterMsgs&&userMsg.versions[userMsg.versionIndex].afterMsgs.length>0){
+userMsg.versions[userMsg.versionIndex].afterMsgs[0]=JSON.parse(JSON.stringify(aiMsg));
+}
+}
+saveCurrentMessages(msgs);
+}catch(err){
+hideLoading();
+const errMsg=err.message||"调用失败";
+const aiMsg=msgs[aiIdx];
+aiMsg.versions.push(`⚠️ 错误：${errMsg}`);
+aiMsg.versionIndex=aiMsg.versions.length-1;
+aiMsg.content=`⚠️ 错误：${errMsg}`;
+saveCurrentMessages(msgs);
+}finally{isLoading=false;sendBtn.classList.remove("disabled");}
+}
+
+function showMessageHistory(idx,msg){
 historyListUl.innerHTML="";
-const all=versions.length?versions:[currentContent];
-all.forEach((ver,i)=>{
+if(!msg.versions||msg.versions.length<=1){
+const li=document.createElement("li");
+li.innerHTML="<span>只有一个版本</span>";
+historyListUl.appendChild(li);
+}else{
+msg.versions.forEach((ver,i)=>{
 const li=document.createElement("li");
 const span=document.createElement("span");
 span.className="version-title";
-const isCur=(i===versions.length-1);
-span.innerText=`版本 ${i+1}${isCur?" (当前)":""}`;
+const isCur=(i===msg.versionIndex);
+let text;
+if(msg.role==="user")text=ver.userContent||"";
+else text=ver||"";
+span.innerText=`版本 ${i+1}${isCur?" (当前)":""}: ${text.slice(0,30)}${text.length>30?"...":""}`;
 span.onclick=()=>{
 switchMessageVersion(idx,i);
 msgHistoryModal.style.display="none";
 };
 li.appendChild(span);historyListUl.appendChild(li);
 });
+}
 msgHistoryModal.style.display="flex";
 }
 
@@ -514,11 +521,10 @@ if(!msgs.length){alert("没有消息可精简");return;}
 const sys=msgs.filter(m=>m.role==="system");
 const nonSys=msgs.filter(m=>m.role!=="system");
 const kept=nonSys.slice(-20);
-// 精简后只保留每个消息的当前版本
 const newMsgs=[...sys,...kept].map(m=>{
 if(m.role==="user"){
 const cur=m.versions[m.versionIndex]||{userContent:m.content,aiContent:null};
-return {role:"user",content:cur.userContent,versions:[{userContent:cur.userContent,aiContent:cur.aiContent}],versionIndex:0};
+return {role:"user",content:cur.userContent,versions:[{userContent:cur.userContent,aiContent:cur.aiContent,afterMsgs:[]}],versionIndex:0};
 }else{
 return {role:"assistant",content:m.content,versions:[m.content],versionIndex:0};
 }
