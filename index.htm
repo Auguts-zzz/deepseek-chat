@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=yes,viewport-fit=cover">
-<title>2610230111</title>
+<title>2610270307</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{background:#e9eef4;font-family:system-ui,sans-serif;display:flex;justify-content:center;min-height:100vh}
@@ -520,7 +520,7 @@ let msgs=conv.messages;
 if(!msgs.length){alert("没有消息可精简");return;}
 const sys=msgs.filter(m=>m.role==="system");
 const nonSys=msgs.filter(m=>m.role!=="system");
-const kept=nonSys.slice(-4);
+const kept=nonSys.slice(-20);
 const newMsgs=[...sys,...kept].map(m=>{
 if(m.role==="user"){
 const cur=m.versions[m.versionIndex]||{userContent:m.content,aiContent:null};
@@ -530,9 +530,9 @@ return {role:"assistant",content:m.content,versions:[m.content],versionIndex:0};
 }
 });
 conv.messages=newMsgs;
-conv.title=(conv.title||"对话")+" (精简2轮)";
+conv.title=(conv.title||"对话")+" (精简10轮)";
 saveAll();renderMessages();updateTitle();
-alert(`已保留最近2轮（共${kept.length}条消息）。`);
+alert(`已保留最近10轮（共${kept.length}条消息）。`);
 }
 
 async function loadModelsForProvider(provider,baseUrl){
